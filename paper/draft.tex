@@ -1,0 +1,268 @@
+\documentclass{article}
+\usepackage{arxiv}
+\usepackage[utf8x]{inputenc}
+\usepackage[english]{babel}
+% \usepackage[T2A, T1]{fontenc}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{lipsum}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{doi}
+\usepackage{amsmath,amsfonts,amssymb,amsthm,mathtools}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{amsthm}
+\usepackage{cleveref}
+
+%\usepackage{subfigure}
+\DeclareMathOperator*{\argmax}{\arg\!\max}
+\DeclareMathOperator*{\argmin}{\arg\!\min}
+
+
+
+\title{LoRA analysis via stable rank}
+
+\author{Nikita Okhotnikov\\
+	\texttt{okhotnikov.nv@phystech.edu} \\
+}
+\date{}
+
+\renewcommand{\shorttitle}{\textit{arXiv} Template}
+
+\hypersetup{
+pdftitle={A template for the arxiv style},
+pdfsubject={q-bio.NC, q-bio.QM},
+pdfauthor={Nikita Okhotnikov},
+}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+
+
+
+\begin{document}
+    \maketitle
+    \begin{abstract}
+        ...
+
+    \end{abstract}
+
+
+
+    \section{Introduction}
+        Recent advances in large language models (LLMs) and multimodal models (MLLM) induce a growing number of various downstream tasks attemtpted to be solved with a single pretrained model. Despite that the performance of such models vastly improved over last years, there are still tasks that cannot be handled in zero-shot setting and some others just benifit a lot from additional fine-tuning. However, the size of LLMs with cutting-edge performance keeps growing and even best open-sourced models nowadays contain hundreds of billions of parameters\cite{deepseekai2025deepseekr1incentivizingreasoningcapability}\cite{kimiteam2025kimik2openagentic}\cite{yang2025qwen3technicalreport}\cite{grattafiori2024llama3herdmodels}. Thus, full finetuning of such models is infeasible in most cases and parameter efficient finetuning (PEFT) methods are required. The most widespread PEFT option is low-rank adaptation (LoRA)\cite{hu2021loralowrankadaptationlarge}. Since the release of the original paper, the approach has been actively studied (CITE SOMETHING HERE), however it still lacks comprehensive theoretical background of expressivity, generalization and expected behaviour. 
+        ...
+
+    \section{Related work}
+        The most general estimate of expressive power of LoRA is presented in \cite{zeng2024expressivepowerlowrankadaptation}.The paper provides rigourous constructive proof of the lower bound for the rank of adapter to accurately represent the target model, for a single linear layer, multi-layer perceptron and even slightly modified transformer models. Being a notable limitation this result is unfortunately as practical as the first universal approximation theorem \cite{hornik1989multilayer} and its follow-ups \cite{bengio2011expressive}\cite{eldan2016power}\cite{liang2016deep}. While the existence of a matrix of specific rank that satisfy the required conditions might shed some light on the theoretical boundaries, it provides no guarantees that such matrix could be achieved with standard gradient optimization techniques. Moreover, the authors of \cite{lion2025polar} showed that the matrix \textit{stable rank} \cite{rudelson2007sampling} of a LoRA matrices is much smaller (actually close to 1) than the regular rank in downstream tasks training regime that drastically limits the actually reacheable subspace of matrices of a given rank and makes the previously discussed theoretical boundaries even less applicable.
+        
+        ...
+
+        \cite{kratsios2025sharpgeneralizationboundsfoundation} presents the upper and lower bounds for the generalization gap of asymmetric low-rank adapters \cite{zhu2024asymmetry} in terms of rank and sample complexity. Generalization gap is defined as the difference between emperical risk and true risk of the model on a given data distribution. The upper bound in the paper is proportional to the $\frac{\sqrt{r}}{N}$, where $r$ is the adapter rank and $N$ is the number of training samples. That is based on the worst case estimates of r-rank matrices and suggests that the potential generalisation might worsen with higher adapter rank. However, it could be potentially tightened if we constrain the stable rank of the resulting LoRA perturbation $\Delta W$. 
+        
+        [THERE'S NEW NOT FULLY CHECKED RESULT WITH $\sim \sqrt{sr(\Delta W)} \Longrightarrow$ NO GROWTH OF THE GENERALIZATION GAP WITH THE INCREASE OF THE RANK AS LONG AS THE STABLE RANK ASSUMPTION HOLDS]
+
+
+        ... 
+
+        [SOME WORDS ABOUT RANK COLLAPSE (STABLE RANK) IN ATTENTION LAYERS \cite{saada2025mindgapspectralanalysis} AS AN ADDITIONAL MOTIVATION THAT REGULAR RANK IS NOT THE RIGHT TOOL TO FORM THE THEORY AROUND]
+    
+    \section{Main part (THINK OF THE TITLE)}
+        \subsection{Single matrix approximation}
+
+            \begin{lemma}
+                Let the $A$ be a target matrix and $\hat{A}$ - an estimate. Let $S_A = \mathbf{sr}(A), ~S_{\hat{A}} = \mathbf{sr}(\hat{A}), ~S_{\hat{A}} \leqslant S_A$ and $\sigma_1(\hat{A}) =\alpha \sigma_1(A)$ $\alpha\geq 0$, where $\sigma_1(.)$ is the first (largest) singular value of corresponding matrix.\\
+                Then: \[ 
+                \|A - \hat{A}\|_F \geqslant \sigma_1(A)\left(\frac{\sqrt{S_A} - \sqrt{S_{\hat{A}}}}{1 + \sqrt{S_{\hat{A}}}}\right)
+                \]
+            \end{lemma}
+
+            \begin{proof}
+
+                \[ \mathbf{sr}(A) = \frac{\|A\|_F^2}{\sigma_1(A)^2} ~ \Longrightarrow \|A\|_F = \sigma_1(A) \sqrt{\mathbf{sr}(A)} \] 
+                \[ \|A - \hat{A}\|_F \geqslant \left| \|A\|_F - \|\hat{A}\|_F \right| ~~ \text{triangle inequality}\]
+                \[ \|A - \hat{A}\|_F \geqslant |\sigma_1(A)\sqrt{S_A} - \sigma_1(\hat{A})\sqrt{S_{\hat{A}}}| = \sigma_1(A)|\sqrt{S_A} - \alpha\sqrt{S_{\hat{A}}}| \]
+                \[\textbf{1.  } \alpha \leq 1:  ~~~~~\|A - \hat{A}\|_F \geqslant \sigma_1(A)\left(\sqrt{S_A} - \sqrt{S_{\hat{A}}}\right)\]
+                \[\textbf{2.  } \alpha \geq 1:  ~~~~~\|A - \hat{A}\|_F \geqslant \|A - \hat{A}\|_{op} \geqslant |\sigma_1(A) - \sigma_1(\hat{A})| = \sigma_1(A)(\alpha - 1)\]
+                $$\|A - \hat{A}\|_F \geqslant \sigma_1(A)\min_{\alpha\geqslant 1}\max \left(\sqrt{S_A} - \alpha\sqrt{S_{\hat{A}}}, \alpha - 1\right)\geqslant \sigma_1(A)\left(\frac{\sqrt{S_A} - \sqrt{S_{\hat{A}}}}{1 + \sqrt{S_{\hat{A}}}}\right)$$
+            \end{proof}
+
+            \begin{lemma} \textbf{(Constructive lower bound)}\label{lemma:lemma2}
+                Assuming the conditions of the previous lemma, let $A_R$ be the optimal unconstrained rank-R approximation of $A$ with singular values $\sigma_1, \dots, \sigma_R$. Let $\overline{S_A} = \mathbf{sr}(A_R)$
+                Then there exists $\hat{A}$ such that  $\mathbf{rank}(\hat{A})\leqslant R, ~~sr(\hat{A}) = S_{\hat{A}} < R,~~ S_A < R$ and 
+                $$\|A - \hat{A}\|_F^2 = \sum\limits_{i=R+1}^{D}\sigma_i^2 + (1 - \gamma)^2 \sum\limits_{i=2}^R\sigma_i^2$$ 
+                Where $\gamma \in [0, 1]$ is defined as:
+                $$ \gamma = \begin{cases} 1 & \text{if } ~ \overline{S_A} \leqslant S \\ \sqrt{\frac{S - 1}{\overline{S_A} - 1}} & \text{if } ~ \overline{S_A} > S \end{cases} $$
+            \end{lemma}
+
+            \begin{proof} $~~$\\
+                1. Let the SVD of $A$ be $\sum_{i=1}^D \sigma_i u_i v_i^T$. The minimal error for any rank-$R$ matrix is bounded by the tail $\sum_{i=R+1}^D \sigma_i^2$. We focus on constructing $\hat{A}$ within the subspace of the top $R$ singular vectors to minimize the additional error.
+                    Let $\hat{A}= \sum_{i=1}^R \hat{\sigma}_i u_i v_i^T$.
+
+                2.  We aim to minimize $\sum_{i=1}^R (\sigma_i - \hat{\sigma}_i)^2$ subject to $\frac{\sum_{i=1}^R \hat{\sigma}_i^2}{\hat{\sigma}_1^2} \leqslant S$.
+                    If $\overline{S_A} \leqslant S$, we set $\hat{\sigma}_i = \sigma_i$ (yielding $\gamma=1$) and the penalty is 0.
+                    If $\overline{S_A} > S$, we must reduce the stable rank. The most efficient way to do this (minimizing Euclidean distance) is to preserve the largest component $\hat{\sigma}_1 = \sigma_1$ (maximizing the denominator) and uniformly shrink the tail components $\hat{\sigma}_i = \gamma \sigma_i$ for $i=2, \dots, R$.
+
+                3.  The stable rank condition becomes equality:
+                    $$ \frac{\sigma_1^2 + \sum_{i=2}^R (\gamma \sigma_i)^2}{\sigma_1^2} = S, ~~~ 1 + \gamma^2 \frac{\sum_{i=2}^R \sigma_i^2}{\sigma_1^2} = S $$
+                    Note that $\overline{S_A} = 1 + \frac{\sum_{i=2}^R \sigma_i^2}{\sigma_1^2}$. Thus:
+                    $$ 1 + \gamma^2 (\overline{S_A} - 1) = S \implies \gamma^2 = \frac{S - 1}{\overline{S_A} - 1} $$
+
+                4.  
+                    The squared error on the top $R$ components is:
+                    $$ (\sigma_1 - \sigma_1)^2 + \sum_{i=2}^R (\sigma_i - \gamma \sigma_i)^2 = (1-\gamma)^2 \sum_{i=2}^R \sigma_i^2 $$
+                    Adding the tail error $\sum_{i=R+1}^D \sigma_i^2$ gives the result.
+            \end{proof}
+            
+
+
+        \subsection{Fully connected network approximation}
+            \subsubsection{Notation}
+                Let $FNN_{L,D}(.;(W_l)_{l=1}^L, (b_l)_{l=1}^L)$ be fully connected neural network with $L$ layers of width $D$ and ReLU activation functions. $W_l\in \mathbb{R}^{D\times D}$ -- weight matrices $b_l\in \mathbb{R}^D$ -- bias vectors.\\ In this work we use 
+                $$\text{target FNN  }~~ \overline{f}:=FNN_{\overline{L},D}(.;(\overline{W}_l)_{l=1}^L, (\overline{b}_l)_{l=1}^L), $$ 
+                $$\text{frozen FNN }~~ f_0:= FNN_{L,D}(.;(W_l)_{l=1}^L, (b_l)_{l=1}^L),$$
+                $$\text{adapted FNN }~~ f:=FNN_{L,D}(.;(W_l + \Delta W_l)_{l=1}^L, (\hat{b}_l)_{l=1}^L)$$
+                where $b_l, \overline{b}_l, \hat{b}_l \in \mathbb{R}^D$, $W_l, \overline{W}_l, \Delta W_l \in \mathbb{R}^{D\times D}$, but $\Delta W_l = A_l B_l$, where $A_l\in \mathbb{R}^{D\times R}$ and $B_l\in \mathbb{R}^{R\times D}$ and $R\leqslant D$ -- the LoRA rank. Additionally, we assume  and $\overline{L} = L$.  \\
+                \subsubsection{Expressive power of FNN}
+                
+                \begin{theorem} Let $x\in \mathbb{R}^d$ be the random input with covariance matrix $\Sigma = \mathbb{E}[xx^T]$
+                    Let $E_l = \overline{W}_l - W_l$ be the weight discrepancy at layer $l$. Let $\sigma_{l,i}$ be the singular values of $E_l$. Assume $\hat{b}_l = \overline{b}_l$. Then there exist adapters $\Delta W_l$ of rank $\leqslant R$ and $\forall l \in\overline{1, L}~~\mathbf{sr}(\Delta W_l) \leqslant S$ such that the expected approximation error is bounded by:
+
+                    $$ \mathbb{E} \| f(\mathbf{x}) - \overline{f}(\mathbf{x}) \|_2 \leqslant \beta \sum_{l=1}^L \left( \prod_{k=l+1}^L \| \overline{W}_k \|_2 \right) \mathcal{T}_l $$
+
+                    Where $\beta$ is the magnitude of the parameters and the input
+                    $$ \beta = \max_{i \in [L]} \left( \underbrace{ \left( \prod_{j=1}^i \|\overline{W}_j\| \right) \sqrt{\text{tr}(\Sigma)} }_{\text{Input Term}} + \underbrace{ \sum_{j=1}^i \left( \prod_{k=j+1}^i \|\overline{W}_k\| \right) \|\overline{b}_j\| }_{\text{Bias Term}} \right) $$ 
+                    and $\mathcal{T}_l$ is the error from \textbf{Lemma 2}:
+                    $$ \mathcal{T}_l = \sqrt{ \sum_{j=R+1}^D \sigma_{l,j}^2 + (1 - \gamma_l)^2 \sum_{j=2}^R \sigma_{l,j}^2 }, ~~\text{with } ~ \gamma_l = \min\left(1, \sqrt{\frac{S-1}{sr(E_l)-1}}\right)$$
+                \end{theorem}
+
+
+                \begin{proof}$~$
+
+                    1.  Linearization:
+                        Let $h_l$ be the output of layer $l$ in the adapted model, and $\overline{h}_l$ in the target model.
+                        $$ h_l = \mathbf{ReLU}((W_l + \Delta W_l) h_{l-1} + \overline{b}_l) $$
+                        $$ \overline{h}_l = \mathbf{ReLU}(\overline{W}_l \overline{h}_{l-1} + \overline{b}_l) $$
+                        We define the error vector 
+                        $$e_l = h_l - \overline{h}_l = \mathbf{ReLU}((W_l + \Delta W_l) h_{l-1}+ \overline{b}_l) - \mathbf{ReLU}(\overline{W}_l \overline{h}_{l-1} + \overline{b}_l) $$
+                        As $\mathbf{ReLU}$ is 1-Lipschitz
+                        $$\|e_l\|_2 \leqslant \| ((W_l + \Delta W_l) h_{l-1}+ \overline{b}_l) - (\overline{W}_l \overline{h}_{l-1} + \overline{b}_l)\|_2 $$
+
+                        Add and subtract $\overline{W}_l h_{l-1}$:
+                        $$ \|e_l\|_2 \leqslant \|(W_l + \Delta W_l - \overline{W}_l) h_{l-1} + \overline{W}_l (h_{l-1} - \overline{h}_{l-1})\|_2 $$
+                        Let $M_l = W_l + \Delta W_l - \overline{W}_l$ be the approximation residual matrix for layer $l$.
+                        $$ \|e_l\|_2 \leqslant \|M_l h_{l-1} + \overline{W}_l e_{l-1}\|_2 $$
+                        
+
+
+                    2.  Unrolling the recursion:
+                        By induction from $l=1$ to $L$ (with $e_0 = 0$):
+                        $$ \|e_L\|_2 \leqslant \sum_{l=1}^L \left\| \prod_{k=l+1}^L \overline{W}_k \right\|_2 \| M_l \|_2 \| h_{l-1} \|_2 $$
+
+                    3.  Constructing the Adapter $\Delta W_l$:
+                        We need to minimize $\| M_l \|_F = \| (W_l + \Delta W_l) - \overline{W}_l \|_F$.
+                        This is equivalent to approximating $E_l = \overline{W}_l - W_l$ with $\Delta W_l$.
+                        Thus we can apply \label{lemma:lemma2} and this yields the Frobenius error:
+                        $$ \| M_l \|_F = \mathcal{T}_l = \sqrt{ \sum_{j=R+1}^D \sigma_{l,j}^2 + (1 - \gamma_l)^2 \sum_{j=2}^R \sigma_{l,j}^2 } $$
+                        Since $\|M_l\|_2 \leqslant \|M_l\|_F$, we use $\mathcal{T}_l$ as the bound for the matrix norm.
+
+
+                    4.  Handling the intermediate norms:
+                        We look at $\mathbb{E} \|e_L\|_2$.
+                        The term depends on $\mathbb{E} \|h_{l-1}\|_2$. $\|h_{l-1}\|_2 \leqslant (\prod_{j=1}^{l-1} \|\overline{W}_j\|_2) \|\mathbf{x}\|_2$.
+                        For the expectation, $\mathbb{E}\|\mathbf{x}\|_2 \leqslant \sqrt{\mathbb{E}\|\mathbf{x}\|^2} = \sqrt{\text{tr}(\Sigma)}$.
+                        
+
+                        We want to bound $\| \overline{h}_i \|_2$.
+
+                            $$ \| \overline{h}_1 \| \leqslant \| \overline{W}_1 \| \| \mathbf{x} \| + \| \overline{b}_1 \| $$
+                            $$ \| \overline{h}_2 \| \leqslant \| \overline{W}_2 \| \| \overline{h}_1 \| + \| \overline{b}_2 \| $$
+                            Substitute the bound for Layer 1:
+                            $$ \| \overline{h}_2 \| \leqslant \| \overline{W}_2 \| ( \| \overline{W}_1 \| \| \mathbf{x} \| + \| \overline{b}_1 \| ) + \| \overline{b}_2 \| $$
+                            $$ \| \overline{h}_2 \| \leqslant \underbrace{\| \overline{W}_2 \| \| \overline{W}_1 \| \| \mathbf{x} \|}_{\text{Input Contribution}} + \underbrace{\| \overline{W}_2 \| \| \overline{b}_1 \| + \| \overline{b}_2 \|}_{\text{Accumulated Bias Contribution}} $$
+                        
+                            By induction, the magnitude of the activation at layer $i$ is bounded by:
+                            $$ \| \overline{h}_i \| \leqslant \left( \prod_{j=1}^i \| \overline{W}_j \| \right) \| \mathbf{x} \| + \sum_{j=1}^i \left( \prod_{k=j+1}^i \| \overline{W}_k \| \right) \| \overline{b}_j \| $$
+                            Taking the expectation and the maximum over layers we get the $\beta$ defined in theorem conditions
+                    5.  Gather up the terms:
+                        $$ \mathbb{E} \| f(\mathbf{x}) - \overline{f}(\mathbf{x}) \|_2 = \mathbb{E}[\|e_L\|_2] \leqslant  \beta \sum_{l=1}^L \left( \prod_{k=l+1}^L \| \overline{W}_k \|_2 \right) \mathcal{T}_l $$
+
+                    \end{proof}
+
+
+            \subsubsection{Expressive power of transformer}
+                ...
+
+
+        
+
+
+        
+
+        \vspace{3cm}
+        \subsection{Upper-bound for LoRA generalization gap}
+           [HERE'S CURRENTLY UNSOLVED PROBLEM WITH THE PROOF!]
+
+            ... 
+
+            In this section we use specifically the setting of \cite{kratsios2025sharpgeneralizationboundsfoundation} paper. Consider a depth-$T$ linear network with 1-Lipschitz activation functions $\sigma(.)$, pre-trained weights $\theta_{pre}$ with $W^{(t)}_{pre}$ weight matrices for each layer. LoRA is applied at some layers via matrices $\Delta W^{(t)} = B^{(t)}A^{(t)}$, where $B^{(t)}$ is random and fixed, $A^{(t)}$ is trainable. Let $\mathcal{F}$ be the resulting random class of functions. Loss is bounded in $[0,1]$
+            \begin{theorem}
+                Assuming that for each adapted layer t, with probability at least $1-\epsilon$
+                $$\|\Delta W^{(t)}\|_{op} \leqslant \Lambda, ~~ \mathbf{sr}(\Delta W^{(t)})\leqslant S, ~~~~~ \mathbf{sr}(M) :=\frac{\|M\|_F^2}{\|M\|_{op}^2}$$
+                $$\forall \delta \in (0, 1],~~ \text{the following holds with probability at least } 1-\delta:$$
+                $$G = \sup\limits_{f\in\mathcal{F}}|R(f) - R_N(f)|\leqslant 4\min\left\{1, \frac{\sqrt{(cT + 1)(\sum_t(m_t + n_t))S}}{\sqrt{6N}} \right\} +\sqrt{\frac{8\log\frac{2}{1 - \sqrt{1 - \delta}}}{N}}$$
+                where $m_t\times n_t$ is the shape of $\Delta W^{(t)}$, $R(f)$ -- true risk, $R^N(f)$ -- empirical risk
+            \end{theorem}
+
+            \begin{proof}
+                The proof follows similar 3-stage structure as the original rank-based theorem. 
+
+                \begin{itemize}
+                    \item[\textbf{Step 1}]\textbf{- Lipschitz constant bound}\\
+                        Consider the mapping 
+                        $$LoRA: \Omega \times \mathcal{G} \to C([0,1]^d, \mathbb{R}^D), $$
+                        $$\mathcal{G} := \{(\Delta W^{(1)}, \dots \Delta W^{(T)}): \|\Delta W^{(t)}\|_{op}\leqslant \Lambda, ~\mathbf{sr}(\Delta W^{(t)})\leqslant S \}\subset \mathbb{R}^q$$
+                        $$\text{ where } \mathcal{G}  \text{ -- the space of vectors of LoRA parameters that satisfy the conditions of the theorem}, $$
+                        $$f_\theta(.)\in C([0,1]^d, \mathbb{R}^D) \text{ -- the model function with adapter with weights } \theta\in\mathcal{G} \text{ applied}$$
+                        Let constant $c$ be so that $\forall t: \|W^{(t)}_{pre}\|_{op}\leqslant c$. \\
+                        Then $\|W^{(t)}\|_{op}\leqslant \|W^{(t)}_{pre}\|_{op} + \|\Delta W^{(t)}\|_{op} \leqslant c + \Lambda$\\
+                        We define intermediate activations $h_t(x)$ recursively: $h_0(x) = x,~ h_t(x) = \sigma(W^{(t)}(h_{t-1}(x))),~ t\in T$\\
+                        Let us fix the parameter vectors $\theta$ and $\theta'$, then as $\sigma(.)$ is 1-Lipschitz, the following holds:
+                        $$\|h_t^{\theta} - h_t^{\theta'}\| = \|\sigma(W^{(t)}h_{t-1}^{\theta}) - \sigma(W'^{(t)}h_{t-1}^{\theta'})\|\leqslant \|W^{(t)}h_{t-1}^{\theta} - W'^{(t)}h_{t-1}^{\theta'}\| \leqslant \|W^{(t)}\|_{op}\|h_{t-1}^\theta - h_{t-1}^{\theta'}\| + \|(W^{(t)} - W'^{(t)})h_{t-1}^{\theta'}\|$$
+                        $$\|(W^{(t)} - W'^{(t)})h_{t-1}^{\theta'}\|\leqslant \|\Delta W^{(t)} - \Delta W'^{(t)}\|_{op} \|h_{t-1}^{\theta'}\|$$
+                        $$\|h_t(x)\|\leqslant \|W^{(t)}\|_{op}\|h_{t-1}(x)\|\leqslant (c + \Lambda)^t \|x\|\leqslant (c + \Lambda)^t$$
+                        $$\|h_t^{\theta} - h_t^{\theta'}\|\leqslant (c + \Lambda) \|h_{t-1}^{\theta} - h_{t-1}^{\theta'}\| + (c + \Lambda)^{t-1}\|\Delta W^{(t)} - \Delta W'^{(t)}\|_{op}$$
+                        $$\|h_t^{\theta} - h_t^{\theta'}\|\leqslant\sum\limits_{t=1}^T (c + \Lambda)^{T - t}(c + \Lambda)^{t - 1}\|\Delta W^{(t)} - \Delta W'^{(t)}\|_{op}\leqslant T(c+\Lambda)^{T-1}\max_t \|\Delta W^{(t)} - \Delta W'^{(t)}\|_{op}$$
+                        $$\|f_\theta(x) - f_{\theta'}(x)\| \leqslant T(c+\Lambda)^{T-1}\max_t \|\Delta W^{(t)} - \Delta W'^{(t)}\|_{op}$$
+                        Thus $LoRA$ mapping defined above is Lipschitz with constant $L = T(c+\Lambda)^{T-1}$ if we consider $\mathcal{G}$ as a space with the metric $d(\theta, \theta') = \max_t\|\Delta W^{(t)} - \Delta W'^{(t)}\|_{op}$.
+                    \item[\textbf{Step 2}]\textbf{- Covering number bound}
+                   
+                        \textbf{Definition (Covering number):} \\
+                        Let $(V, \|.\|)$ be a normed space. \\
+                        Let $B(\rho, v_0) = \{v \in V: \|v - v_0\|\leqslant \rho\}$ be the ball with radius $rho$ and center $v_0 \in V$. $B(\rho) = B(\rho, 0)$\\
+                        For any $K\in B$ and number $\varepsilon > 0$ an $\varepsilon$-covering of $K$ is a finite set $\{v1,\dots , v_N\}\subset K$ such that 
+                        $$K\subset \bigcup\limits_{i=1}^N B(\varepsilon, v_i)$$
+                        Then $\varepsilon$-covering number $\mathcal{N}(\varepsilon, K)$ of a compact set $K\subset V$ is defined as
+                        $$\mathcal{N}(\varepsilon, K) = \min\{N:\exists\text{ an }\varepsilon\text{-covering of }K \text{ with size } N\}<\infty$$
+                        
+                        $\|M\|_{op}\leqslant \Lambda,~\mathbf{sr}(M) \leqslant S \Longrightarrow \|M\|_F\leqslant \Lambda\sqrt{S}$
+
+                        Let $\mathcal{M} = \{M: \in \mathbb{R}^{m\times n}: \|M\|_F\leqslant \Lambda \sqrt{S}\}$ 
+
+                        [PROBLEM FROM HERE, NEED TO FIX THE PROOF]
+
+
+                \end{itemize}
+            \end{proof}
+
+    \bibliographystyle{plain}
+    \bibliography{references.bib}
+
+\end{document}
+

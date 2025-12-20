@@ -1,0 +1,177 @@
+\documentclass[10pt]{beamer}
+
+\usepackage{amsfonts}
+\usepackage{subfiles}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+
+\usepackage{amsmath, amsfonts, amssymb, amsthm, mathtools, mathrsfs}
+\usepackage{wasysym, dsfont}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+% \usepackage{subfigure}
+
+\usepackage{multicol}
+\DeclareMathOperator*{\argmax}{\arg\!\max}
+\DeclareMathOperator*{\argmin}{\arg\!\min}
+
+\mode<presentation>
+{
+	\usetheme{boxes}
+	\beamertemplatenavigationsymbolsempty{}
+	
+	\setbeamertemplate{footline}[page number]
+	\setbeamersize{text margin left=1em, text margin right=1.5em}
+}
+\newcommand\blfootnote[1]{%
+	\begingroup
+	\renewcommand\thefootnote{}\footnote{#1}%
+	\addtocounter{footnote}{-1}%
+	\endgroup
+}
+\newcommand\FontUP{\fontsize{12}{12}\selectfont}
+
+
+\title[]{More realistic expressive power bounds for low-rank adaptation}
+
+\author{Nikita Okhotnikov}
+
+\institute{MIPT}
+\date{2025}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage{}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Introduction}
+    LoRA -- most popular yet understudied method of parameter-efficient fine-tuning
+    \vfill
+    \begin{block}{Problem}
+        Existing theoretical estimates of  LoRA expressive power is overly optimistic
+    \end{block}
+    \vfill
+    \begin{block}{Observation}
+        Empirical results show that it is not the rank that limits the performance of the adapters
+    \end{block}
+    \vfill
+    \begin{block}{Proposal}
+        Derive the more realistic expressive power bounds based on stable rank 
+    \end{block}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Preliminary theory}
+    \vspace{-0.2cm}
+    \begin{block}{Stable rank}
+        \vspace{-0.5cm}
+        $$\text{For matrix } A \text{ stable rank is } ~ sr(A) = \frac{\|A\|_F^2}{\|A\|_{op}^2} = \frac{\sum_i \sigma_i^2(A)}{\sigma_1^2(A)}$$
+        \vspace{-0.5cm}
+    \end{block}
+    \begin{block}{Lemma (single matrix approximation lower bound)}
+        $A$ -- target matrix, $\hat{A}$ - an estimate. $S_A = \mathbf{sr}(A), ~S_{\hat{A}} = \mathbf{sr}(\hat{A}), ~S_{\hat{A}} \leqslant S_A$ and $\sigma_1(\hat{A}) =\alpha \sigma_1(A)$, $\alpha\geq 0$ then:
+        \vspace{-0.3cm}
+        $$\|A - \hat{A}\|_F \geqslant \sigma_1(A)\left(\frac{\sqrt{S_A} - \sqrt{S_{\hat{A}}}}{1 + \sqrt{S_{\hat{A}}}}\right)$$
+        \vspace{-0.5cm}
+    \end{block}
+    \begin{block}{Lemma (constructive lower bound)}
+        Let $A_R$ be the optimal unconstrained rank-R approximation of $A$ with singular values $\sigma_1, \dots, \sigma_R$. $\overline{S_A} = \mathbf{sr}(A_R)$.
+        Then there exists $\hat{A}$ such that $\mathbf{rank}(\hat{A})\leqslant R, ~~sr(\hat{A}) = S_{\hat{A}} \leqslant S \leqslant R$ and 
+        \vspace{-0.3cm}
+        $$\|A - \hat{A}\|_F^2 = \sum\limits_{i=R+1}^{D}\sigma_i^2 + (1 - \gamma)^2 \sum\limits_{i=2}^R\sigma_i^2, 
+        ~~\text{ where } \gamma = \begin{cases} 1 & \text{if } ~ \overline{S_A} \leqslant S \\ \sqrt{\frac{S - 1}{\overline{S_A} - 1}} & \text{if } ~ \overline{S_A} > S \end{cases} $$
+
+        \vspace{-0.3cm}
+        To get $\hat{A}$: SVD of $A_R = \sum\limits_{i=1}^R \sigma_i u_i v_i^T$, $~~\sigma_2, \dots \sigma_R \longrightarrow \gamma\cdot\sigma_2, \dots \gamma\cdot\sigma_R$
+    \end{block}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Fully connected network approximation}
+    \vspace{-0.3cm}
+    \begin{block}{Notation}
+        $\text{target FNN  }~~ \overline{f}:=FNN_{\overline{L},D}(.;(\overline{W}_l)_{l=1}^L, (\overline{b}_l)_{l=1}^L), $\\
+        $\text{frozen FNN }~~ f_0:= FNN_{L,D}(.;(W_l)_{l=1}^L, (b_l)_{l=1}^L),$\\
+        $\text{adapted FNN }~~ f:=FNN_{L,D}(.;(W_l + \Delta W_l)_{l=1}^L, (\hat{b}_l)_{l=1}^L)$\\
+        $b_l, \overline{b}_l, \hat{b}_l \in \mathbb{R}^D$, $W_l, \overline{W}_l, \Delta W_l \in \mathbb{R}^{D\times D}$, but $\Delta W_l = A_l B_l$, where $A_l\in \mathbb{R}^{D\times R}$ and $B_l\in \mathbb{R}^{R\times D}$ and $R\leqslant D$ -- the LoRA rank. Additionally, we assume  and $\overline{L} = L$.
+    \end{block}
+    \begin{block}{Theorem (FNN error upper bound)}
+        Let $x\in \mathbb{R}^d$ be the random input with covariance matrix $\Sigma = \mathbb{E}[xx^T]$
+        Let $E_l = \overline{W}_l - W_l$ be the weight discrepancy at layer $l$. Let $\sigma_{l,i}$ be the singular values of $E_l$. Assume $\hat{b}_l = \overline{b}_l$. Then there exist adapters $\Delta W_l$ with $\mathbf{sr}(\Delta W_l) \leqslant S~~\forall l \in\overline{1, L}$ such that the expected error is bounded by:
+        \vspace{-0.3cm}
+        $$ \mathbb{E} \| f(\mathbf{x}) - \overline{f}(\mathbf{x}) \|_2 \leqslant \beta \sum_{l=1}^L \left( \prod_{k=l+1}^L \| \overline{W}_k \|_2 \right) \mathcal{T}_l, ~\text{where} $$
+        \vspace{-0.3cm}
+
+        $ \beta = \max_{i \in [L]} \left( \left( \prod_{j=1}^i \|\overline{W}_j\| \right) \sqrt{\text{tr}(\Sigma)} + \sum_{j=1}^i \left( \prod_{k=j+1}^i \|\overline{W}_k\| \right) \|\overline{b}_j\| \right) $\\
+        and $ \mathcal{T}_l = \sqrt{ \sum_{j=R+1}^D \sigma_{l,j}^2 + (1 - \gamma_l)^2 \sum_{j=2}^R \sigma_{l,j}^2 }, ~~\text{with } ~ \gamma_l = \min\left(1, \sqrt{\frac{S-1}{sr(E_l)-1}}\right)$
+
+    \end{block}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Preliminary experiments}
+    \begin{block}{Controlled small scale setting}
+        Randomly initialize 3-layer MLP with ReLU $\overline{f}_0$\\
+        Generate data $x\sim \mathcal{N}(0, I)\to \overline{f}_0 \to y$\\
+        Pretrain 3-layer MLP $f_0$ to map $x$ to $y$ \\ 
+        Modify $\overline{f}_0 \to \overline{f}$, add $\Delta\overline{W}_2\in \mathbb{R}^{d\times d}$ to second layer, with $\mathbf{sr}(\Delta\overline{W}_2) \approx d = 256$
+        Train $f_0 \to f$ with $R$-rank LoRA and measure $\mathbf{sr}(\Delta W_2)$ and loss\\
+        \begin{table}[]
+            \begin{tabular}{|l|l|l|l|l|}
+            \hline
+            R  & 4     & 16    & 64    & 256   \\ \hline
+            SR & 1.65  & 3.05  & 4.89  & 6.07  \\ \hline
+            Loss  & 0.050 & 0.031 & 0.017 & 0.014 \\ \hline
+            \end{tabular}
+        \end{table}
+    \end{block}
+    \vspace{-0.3cm}
+    \begin{block}{LLM and real downstream task}
+        Pretrained Qwen2.5-0.5B model \\
+        Text to SQL dataset \\
+        Apply LoRA to each FFN block \\
+        Measure resulting loss and stable rank
+
+        \begin{table}[]
+            \begin{tabular}{|l|l|l|l|l|}
+            \hline
+            R  & 4    & 16   & 64   & 256  \\ \hline
+            SR & 2.7  & 3.9  & 3.6  & 2.8  \\ \hline
+            Loss  & 1.01 & 0.99 & 0.99 & 0.98 \\ \hline
+            \end{tabular}
+        \end{table}
+        Moreover, full FT gives loss $\sim0.7$ $\Longrightarrow$ low SR is the optimization problem 
+        
+    \end{block}
+
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Conclusion}
+    \begin{block}{Current results}
+        \begin{enumerate}
+            \item Fundamental limit of low stable rank approximation is shown 
+            \item FNN error upper bound based on stable rank is proved
+            \item Optimization procedure low stable rank limitation is empirically demonstrated
+        \end{enumerate}
+    \end{block}
+\end{frame}
+
+
+
+
+\end{document}
