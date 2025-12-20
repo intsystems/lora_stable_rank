@@ -39,7 +39,7 @@
 \newcommand\FontUP{\fontsize{12}{12}\selectfont}
 
 
-\title[]{More realistic expressive power bounds for low-rank adaptation}
+\title[]{More realistic expressivity bounds for low-rank adaptation}
 
 \author{Nikita Okhotnikov}
 
@@ -123,6 +123,7 @@
 
 \begin{frame}
     \frametitle{Preliminary experiments}
+    \vspace{-0.2cm}
     \begin{block}{Controlled small scale setting}
         Randomly initialize 3-layer MLP with ReLU $\overline{f}_0$\\
         Generate data $x\sim \mathcal{N}(0, I)\to \overline{f}_0 \to y$\\
@@ -138,13 +139,15 @@
             \end{tabular}
         \end{table}
     \end{block}
-    \vspace{-0.3cm}
+    
+    \vspace{-0.4cm}
+
     \begin{block}{LLM and real downstream task}
         Pretrained Qwen2.5-0.5B model \\
         Text to SQL dataset \\
         Apply LoRA to each FFN block \\
         Measure resulting loss and stable rank
-
+        \vspace{-0.1cm}
         \begin{table}[]
             \begin{tabular}{|l|l|l|l|l|}
             \hline
@@ -153,7 +156,8 @@
             Loss  & 1.01 & 0.99 & 0.99 & 0.98 \\ \hline
             \end{tabular}
         \end{table}
-        Moreover, full FT gives loss $\sim0.7$ $\Longrightarrow$ low SR is the optimization problem 
+        \vspace{-0.1cm}
+        Moreover, full FT gives loss $\sim0.7$ $\Longrightarrow$ low SR is an actual problem 
         
     \end{block}
 
