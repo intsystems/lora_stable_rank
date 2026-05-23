@@ -21,6 +21,9 @@
 \usepackage{multicol}
 \DeclareMathOperator*{\argmax}{\arg\!\max}
 \DeclareMathOperator*{\argmin}{\arg\!\min}
+\DeclareMathOperator{\sr}{sr}
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\tr}{tr}
 
 \mode<presentation>
 {
@@ -39,9 +42,12 @@
 \newcommand\FontUP{\fontsize{12}{12}\selectfont}
 
 
-\title[]{More realistic expressivity bounds for low-rank adaptation}
+\title[]{Stable rank based expressivity and generalization analysis of Low-Rank-Adapters}
 
-\author{Nikita Okhotnikov}
+\author{Nikita Okhotnikov\\ Scientific supervisor: Andrey Grabovoy}
+
+% ДОБАВИТЬ ВТОРОГО АВТОРА!!!
+
 
 \institute{MIPT}
 \date{2025}
@@ -55,18 +61,18 @@
 
 \begin{frame}
     \frametitle{Introduction}
-    LoRA -- most popular yet understudied method of parameter-efficient fine-tuning
+        LoRA -- most popular yet still understudied method of parameter-efficient fine-tuning
     \vfill
     \begin{block}{Problem}
-        Existing theoretical estimates of  LoRA expressive power is overly optimistic
+        Existing theoretical estimates rely on algebraic rank and misalign with practical results
     \end{block}
     \vfill
     \begin{block}{Observation}
-        Empirical results show that it is not the rank that limits the performance of the adapters
+        Empirical results show that it is not the rank that limits the performance of the adapters or lead to overfitting
     \end{block}
     \vfill
     \begin{block}{Proposal}
-        Derive the more realistic expressive power bounds based on stable rank 
+        Derive the more practical bounds based on stable rank 
     \end{block}
 \end{frame}
 
@@ -74,26 +80,30 @@
 \begin{frame}
     \frametitle{Preliminary theory}
     \vspace{-0.2cm}
-    \begin{block}{Stable rank}
+    \begin{block}{Interpretable SR-Constrained Approximation Error Lower Bound}
         \vspace{-0.5cm}
         $$\text{For matrix } A \text{ stable rank is } ~ sr(A) = \frac{\|A\|_F^2}{\|A\|_{op}^2} = \frac{\sum_i \sigma_i^2(A)}{\sigma_1^2(A)}$$
         \vspace{-0.5cm}
     \end{block}
     \begin{block}{Lemma (single matrix approximation lower bound)}
-        $A$ -- target matrix, $\hat{A}$ - an estimate. $S_A = \mathbf{sr}(A), ~S_{\hat{A}} = \mathbf{sr}(\hat{A}), ~S_{\hat{A}} \leqslant S_A$ and $\sigma_1(\hat{A}) =\alpha \sigma_1(A)$, $\alpha\geq 0$ then:
+        $A$ -- target matrix, $\hat{A}$ - an estimate. $S_A = \mathbf{sr}(A), ~S_{\hat{A}} = \mathbf{sr}(\hat{A}), ~S_{\hat{A}} \leqslant S_A$ then:
         \vspace{-0.3cm}
         $$\|A - \hat{A}\|_F \geqslant \sigma_1(A)\left(\frac{\sqrt{S_A} - \sqrt{S_{\hat{A}}}}{1 + \sqrt{S_{\hat{A}}}}\right)$$
         \vspace{-0.5cm}
     \end{block}
-    \begin{block}{Lemma (constructive lower bound)}
-        Let $A_R$ be the optimal unconstrained rank-R approximation of $A$ with singular values $\sigma_1, \dots, \sigma_R$. $\overline{S_A} = \mathbf{sr}(A_R)$.
-        Then there exists $\hat{A}$ such that $\mathbf{rank}(\hat{A})\leqslant R, ~~sr(\hat{A}) = S_{\hat{A}} \leqslant S \leqslant R$ and 
-        \vspace{-0.3cm}
-        $$\|A - \hat{A}\|_F^2 = \sum\limits_{i=R+1}^{D}\sigma_i^2 + (1 - \gamma)^2 \sum\limits_{i=2}^R\sigma_i^2, 
-        ~~\text{ where } \gamma = \begin{cases} 1 & \text{if } ~ \overline{S_A} \leqslant S \\ \sqrt{\frac{S - 1}{\overline{S_A} - 1}} & \text{if } ~ \overline{S_A} > S \end{cases} $$
+    \begin{block}{Lemma 2 (Optimal SR-constrained approximation)}
+        Let $A_R = \sum_{i=1}^R \sigma_i u_i v_i^T$ be the optimal rank-$R$ approx. of $A$, $S \in [1, R]$ the SR limit.
+        $\mathcal{M}_{R,S}$ = matrices with $\rank \leqslant R$, $\sr \leqslant S$.
 
+        If $\sr(A_R) \leqslant S$: $\hat{A} = A_R$. If $\sr(A_R) > S$, the optimal $\hat{A} \in \mathcal{M}_{R,S}$ has:
         \vspace{-0.3cm}
-        To get $\hat{A}$: SVD of $A_R = \sum\limits_{i=1}^R \sigma_i u_i v_i^T$, $~~\sigma_2, \dots \sigma_R \longrightarrow \gamma\cdot\sigma_2, \dots \gamma\cdot\sigma_R$
+
+        $$\hat{\sigma}_1 = \tfrac{\sigma_1 + \sqrt{S-1}\sqrt{\sum_{j=2}^R\sigma_j^2}}{S},\quad \hat{\sigma}_i = \gamma \sigma_i ~ (i \geqslant 2), \;\gamma = \tfrac{\sqrt{S-1}\hat{\sigma}_1}{\sqrt{\sum_{j=2}^R\sigma_j^2}}$$
+        
+        \vspace{-0.3cm}
+        Minimal error: $\|A - \hat{A}\|_F^2 = \sum_{i=R+1}^{D}\sigma_i^2 + \Delta_S$, ~ $\Delta_S = \frac{1}{S}\big(\sqrt{\sum_{i=2}^R\sigma_i^2} - \sqrt{S-1}\sigma_1\big)^2$
+        \vspace{-0.3cm}
+        (If $\sr(A_R) \leqslant S$, $\Delta_S = 0$)
     \end{block}
 \end{frame}
 
@@ -107,72 +117,90 @@
         $\text{adapted FNN }~~ f:=FNN_{L,D}(.;(W_l + \Delta W_l)_{l=1}^L, (\hat{b}_l)_{l=1}^L)$\\
         $b_l, \overline{b}_l, \hat{b}_l \in \mathbb{R}^D$, $W_l, \overline{W}_l, \Delta W_l \in \mathbb{R}^{D\times D}$, but $\Delta W_l = A_l B_l$, where $A_l\in \mathbb{R}^{D\times R}$ and $B_l\in \mathbb{R}^{R\times D}$ and $R\leqslant D$ -- the LoRA rank. Additionally, we assume  and $\overline{L} = L$.
     \end{block}
-    \begin{block}{Theorem (FNN error upper bound)}
+    \begin{block}{Theorem (FNN error bound)}
         Let $x\in \mathbb{R}^d$ be the random input with covariance matrix $\Sigma = \mathbb{E}[xx^T]$
-        Let $E_l = \overline{W}_l - W_l$ be the weight discrepancy at layer $l$. Let $\sigma_{l,i}$ be the singular values of $E_l$. Assume $\hat{b}_l = \overline{b}_l$. Then there exist adapters $\Delta W_l$ with $\mathbf{sr}(\Delta W_l) \leqslant S~~\forall l \in\overline{1, L}$ such that the expected error is bounded by:
+        Let $E_l = \overline{W}_l - W_l$ be the weight discrepancy. Let $E_{l,R}$ be its optimal rank-$R$ approx. with singular values $\sigma_{l,1} \geqslant \dots \geqslant \sigma_{l,R}$. Assume $\hat{b}_l = \overline{b}_l$. Then there exist adapters $\Delta W_l$ with $\mathbf{sr}(\Delta W_l) \leqslant S~~\forall l \in\overline{1, L}$ such that the expected error is bounded by:
         \vspace{-0.3cm}
         $$ \mathbb{E} \| f(\mathbf{x}) - \overline{f}(\mathbf{x}) \|_2 \leqslant \beta \sum_{l=1}^L \left( \prod_{k=l+1}^L \| \overline{W}_k \|_2 \right) \mathcal{T}_l, ~\text{where} $$
         \vspace{-0.3cm}
 
         $ \beta = \max_{i \in [L]} \left( \left( \prod_{j=1}^i \|\overline{W}_j\| \right) \sqrt{\text{tr}(\Sigma)} + \sum_{j=1}^i \left( \prod_{k=j+1}^i \|\overline{W}_k\| \right) \|\overline{b}_j\| \right) $\\
-        and $ \mathcal{T}_l = \sqrt{ \sum_{j=R+1}^D \sigma_{l,j}^2 + (1 - \gamma_l)^2 \sum_{j=2}^R \sigma_{l,j}^2 }, ~~\text{with } ~ \gamma_l = \min\left(1, \sqrt{\frac{S-1}{sr(E_l)-1}}\right)$
-
+        and $ \mathcal{T}_l = \sqrt{ \sum_{j=R+1}^D \sigma_{l,j}^2 + \Delta_{S,l} }, ~~\text{where }$
+        
+        $\Delta_{S,l} = \frac{1}{S}\Big(\sqrt{\sum_{j=2}^R\sigma_{l,j}^2} - \sqrt{S-1}\sigma_{l,1}\Big)^2  \text{if } \sr(E_{l,R}) > S, ~~ 0 \text{ else} $
     \end{block}
 \end{frame}
 
 
 \begin{frame}
-    \frametitle{Preliminary experiments}
+    \frametitle{Transformer Network Approximation}
+    \vspace{-0.3cm}
+    \begin{block}{Notation}
+        $TN_{L,D}$: $L$ blocks, $H$-head self-attention + 2-layer FFN, no dropout/norm.\\
+        Target $\overline{f}$, frozen $f_0$, adapted $f$ (LoRA on all $Q,K,V,O$, both FFN layers, output).\\
+        $\mathcal{T}(G) = \sqrt{\sum_{i=R+1}^{D}\sigma_i^2(G) + \Delta_S(G)}$ -- SR error from \textbf{Lemma 2}.
+    \end{block}
+    \vspace{-0.2cm}
+    \begin{block}{Theorem (Transformer error bound)}
+        \vspace{-0.2cm}
+        There exists a $\leqslant S$ SR adapter configuration such that
+        \vspace{-0.2cm}
+        $$\mathbb{E}\|f(x) - \overline{f}(x)\|_F \leqslant \beta\sum_{l=1}^{L}\Big(\prod_{k=l+1}^L \gamma_k\Big)\mathcal{D}_l$$
+        $\bullet$ $\gamma_k$: Lipschitz constant of target block $k$ w.r.t. input (via FFN + MHA)\\
+        $\bullet$ $\mathcal{D}_l = \mathcal{T}_{2,l} + \|\overline{W_{2,l}}\|\mathcal{T}_{1,l} + \|\overline{W_{2,l}}\|\|\overline{W_{1,l}}\|\sum_h \mathcal{D}_{att,l}^h$ (FFN + attention errors)\\
+        $\bullet$ $\mathcal{D}_{att,l}^h$: per-head distortion $\propto \mathcal{T}_{O},\mathcal{T}_{V},\mathcal{T}_{Q},\mathcal{T}_{K}$ amplified by score sensitivity $C_{score}$
+    \end{block}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Upper-bound for LoRA Generalization Gap}
+    \vspace{-0.2cm}
+    \begin{block}{Notation}
+
+        Depth-$T$ network, 1-Lipschitz $\sigma(.)$, $\sigma(0)=0$, LoRA on each layer $\Delta W_t = B_t A_t^T$.\\
+        $\|x_i\|_2 \leqslant B_x$, $\|\Delta W_t\|_{op} \leqslant \Lambda_t$, $\sr(\Delta W_t) \leqslant S_t$, $d_{max} = \max_t(d_t)$.
+        \vspace{-0.15cm}
+        $$\text{Margin: } m(f_W(x), y) = f_W(x)_y - \max_{j \neq y} f_W(x)_j$$
+        \vspace{-0.3cm}
+        $$L_\gamma(W) = \mathbb{P}_{(x,y)}[m(f_W(x), y) \le \gamma], \;\; \widehat{L}_\gamma(W) = \tfrac{1}{N}\sum_{i=1}^N \mathbb{I}[m(f_W(x_i), y_i) \le \gamma]$$
+        \vspace{-0.3cm}
+    \end{block}
+    \vspace{-0.2cm}
+    \begin{block}{Theorem (PAC-Bayesian generalization bound)}
+        $\forall \gamma > 0$ and any $W = W_0 + \Delta W$ that satisfies the aforementioned conditions with probability at least $1-\delta$ by the choice of training sample of size $N$:
+        \vspace{-0.1cm}
+        $$L_0(W) \leqslant \widehat{L}_\gamma(W) + \mathcal{O}\!\left(\!\sqrt{\tfrac{B_x^2 T^2 (d_{max} + \ln(TN)) \left( \prod_{t=1}^T \bar{\beta}_t^2 \right) \sum_{t=1}^T \frac{\Lambda_t^2 S_t}{\bar{\beta}_t^2} + \log(N/\delta)}{\gamma^2 N}}\right)$$
+        \vspace{-0.35cm}
+        \textbf{Scales as} $\mathcal{O}(\sqrt{S/N})$ unlike previously known best $\mathcal{O}(\sqrt{r/N})$.
+    \end{block}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Experiments}
     \vspace{-0.2cm}
     \begin{block}{Controlled small scale setting}
-        Randomly initialize 3-layer MLP with ReLU $\overline{f}_0$\\
-        Generate data $x\sim \mathcal{N}(0, I)\to \overline{f}_0 \to y$\\
-        Pretrain 3-layer MLP $f_0$ to map $x$ to $y$ \\ 
-        Modify $\overline{f}_0 \to \overline{f}$, add $\Delta\overline{W}_2\in \mathbb{R}^{d\times d}$ to second layer, with $\mathbf{sr}(\Delta\overline{W}_2) \approx d = 256$
-        Train $f_0 \to f$ with $R$-rank LoRA and measure $\mathbf{sr}(\Delta W_2)$ and loss\\
-        \begin{table}[]
-            \begin{tabular}{|l|l|l|l|l|}
-            \hline
-            R  & 4     & 16    & 64    & 256   \\ \hline
-            SR & 1.65  & 3.05  & 4.89  & 6.07  \\ \hline
-            Loss  & 0.050 & 0.031 & 0.017 & 0.014 \\ \hline
-            \end{tabular}
-        \end{table}
+        Initialize 10-layer MLP $\overline{f}_0$ (teacher), copy it's weights to $f_0$ (student)\\
+        Shift $\overline{f}_0 \to \overline{f}$ by adding  $\Delta\overline{W}_i\in \mathbb{R}^{d\times d}$ with variable SR to the layers  \\
+        Generate data $x\sim \mathcal{N}(0, I)\to \overline{f} \to y$. Train $f_0 \to f$ on $(x,y)$ pairs and evaluate.
     \end{block}
-    
-    \vspace{-0.4cm}
-
-    \begin{block}{LLM and real downstream task}
-        Pretrained Qwen2.5-0.5B model \\
-        Text to SQL dataset \\
-        Apply LoRA to each FFN block \\
-        Measure resulting loss and stable rank
-        \vspace{-0.1cm}
-        \begin{table}[]
-            \begin{tabular}{|l|l|l|l|l|}
-            \hline
-            R  & 4    & 16   & 64   & 256  \\ \hline
-            SR & 2.7  & 3.9  & 3.6  & 2.8  \\ \hline
-            Loss  & 1.01 & 0.99 & 0.99 & 0.98 \\ \hline
-            \end{tabular}
-        \end{table}
-        \vspace{-0.1cm}
-        Moreover, full FT gives loss $\sim0.7$ $\Longrightarrow$ low SR is an actual problem 
-        
-    \end{block}
+    \begin{figure}
+        \centering
+        \includegraphics[scale=0.16]{../figures/graphs_for_slides.png}
+    \end{figure}
 
 \end{frame}
 
 
 \begin{frame}
     \frametitle{Conclusion}
-    \begin{block}{Current results}
-        \begin{enumerate}
-            \item Fundamental limit of low stable rank approximation is shown 
-            \item FNN error upper bound based on stable rank is proved
-            \item Optimization procedure low stable rank limitation is empirically demonstrated
-        \end{enumerate}
-    \end{block}
+    \begin{enumerate}
+        \item Optimal rank $\leqslant R$ stable rank $\leqslant S$ lemma proven
+        \item FNN and Transformer previously known expressivity bounds adjusted for constrained stable rank
+        \item Generalisation gap upper bound tightened from $\mathcal{O}(\sqrt{R/N})$ to $\mathcal{O}(\sqrt{S/N})$
+        \item Stable rank empirically shown to be a better proxy for generalization and expressivity scaling
+    \end{enumerate}
 \end{frame}
 
 
