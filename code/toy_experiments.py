@@ -82,19 +82,25 @@ class MLP4(nn.Module):
         h = self.act(self.layers[2](h))
         return self.layers[3](h)
 
-def make_mlp(n_layers: int, input_dim: int, hidden_dim: int) -> nn.Module:
+def make_mlp(n_layers: int, input_dim: int, hidden_dim: int, output_dim: int = None) -> nn.Module:
     """Creates an MLP with n_layers linear layers and SiLU activations between all but the last.
-    First layer: input_dim → hidden_dim. Last: hidden_dim → input_dim. Middle: hidden_dim → hidden_dim.
-    For n_layers=4 the behaviour is identical to MLP4(input_dim, hidden_dim, input_dim)."""
+    First layer: input_dim → hidden_dim. Last: hidden_dim → output_dim. Middle: hidden_dim → hidden_dim.
+    If output_dim is None, it defaults to input_dim."""
+    if output_dim is None:
+        output_dim = input_dim
+        
     class _FlexMLP(nn.Module):
         def __init__(self):
             super().__init__()
             layer_list = []
             for i in range(n_layers):
-                if i == 0:
+                if n_layers == 1:
+                    # Edge case: single layer network
+                    layer_list.append(nn.Linear(input_dim, output_dim))
+                elif i == 0:
                     layer_list.append(nn.Linear(input_dim, hidden_dim))
                 elif i == n_layers - 1:
-                    layer_list.append(nn.Linear(hidden_dim, input_dim))
+                    layer_list.append(nn.Linear(hidden_dim, output_dim))
                 else:
                     layer_list.append(nn.Linear(hidden_dim, hidden_dim))
             self.layers = nn.ModuleList(layer_list)
@@ -191,114 +197,6 @@ class LoRAFlexWrapper(nn.Module):
         srs = [l.get_stable_rank() for l in self._lora_layers]
         return sum(srs) / len(srs) if srs else 0.0
 
-
-class OrthoLoRALayer(nn.Module):
-    """
-    Orthogonal-factor LoRA (PoLAR-inspired).
-
-        ΔW = α · X · Θ · Yᵀ        if trainable_theta
-        ΔW = α · X · Yᵀ            otherwise   (SR(ΔW) = r exactly)
-
-    where X ∈ R^{d_out × r}, Y ∈ R^{d_in × r} are constrained to the Stiefel
-    manifold (XᵀX = I_r, YᵀY = I_r) via
-    ``torch.nn.utils.parametrizations.orthogonal``, α ∈ R is a trainable scalar
-    initialized to 0 (so ΔW = 0 at t=0), and Θ ∈ R^{r×r} is an optional
-    unconstrained trainable matrix initialized to I_r.
-
-    Note: no 1/√r normalisation — ‖ΔW‖_F = |α|·√r grows with rank, giving the
-    adapter more absolute capacity at larger ranks.
-
-    Reference: Lion et al., 2025, "PoLAR: Polar-Decomposed Low-Rank Adapter
-    Representation" (see papers/PoLAR_*.pdf).
-    """
-    def __init__(self, base_layer: nn.Linear, rank: int, trainable_theta: bool = False):
-        super().__init__()
-        d_in = base_layer.in_features
-        d_out = base_layer.out_features
-        if rank > min(d_in, d_out):
-            raise ValueError(
-                f"OrthoLoRALayer requires rank <= min(d_in, d_out); "
-                f"got rank={rank}, d_in={d_in}, d_out={d_out}. The Stiefel "
-                f"parametrization is only valid for tall matrices."
-            )
-
-        self.base_layer = base_layer
-        self.rank = rank
-        self.trainable_theta = trainable_theta
-
-        # Use bias-free nn.Linear containers so we can wrap their .weight with
-        # the orthogonal parametrization. Linear weight shape = (out, in), so
-        # - X container: weight ∈ R^{d_out × r}  -> Linear(rank, d_out)
-        # - Y container: weight ∈ R^{d_in × r}   -> Linear(rank, d_in)
-        self.X_param = nn.Linear(rank, d_out, bias=False)
-        self.Y_param = nn.Linear(rank, d_in, bias=False)
-        torch.nn.utils.parametrizations.orthogonal(self.X_param, "weight")
-        torch.nn.utils.parametrizations.orthogonal(self.Y_param, "weight")
-
-        # Trainable scalar scale; initialized to 0 so ΔW = 0 at t=0.
-        self.alpha = nn.Parameter(torch.zeros(1))
-
-        if trainable_theta:
-            self.Theta = nn.Parameter(torch.eye(rank))
-        else:
-            self.Theta = None
-
-        # Freeze base layer (same pattern as LoRALayer)
-        self.base_layer.weight.requires_grad = False
-        if self.base_layer.bias is not None:
-            self.base_layer.bias.requires_grad = False
-
-    def _XY(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        # Orthogonal-parametrized weights: X ∈ (d_out, r), Y ∈ (d_in, r)
-        return self.X_param.weight, self.Y_param.weight
-
-    def get_delta_W(self) -> torch.Tensor:
-        """Returns ΔW of shape (d_out, d_in)."""
-        X, Y = self._XY()
-        if self.Theta is not None:
-            core = X @ self.Theta @ Y.T  # (d_out, d_in)
-        else:
-            core = X @ Y.T               # (d_out, d_in)
-        return self.alpha * core
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # base_out: F.linear(x, W_base, b_base); delta_out = x @ ΔWᵀ
-        base_out = self.base_layer(x)
-        X, Y = self._XY()
-        # (x @ Y) @ (something) @ Xᵀ  (associativity avoids forming full ΔW)
-        h = x @ Y                                  # (B, r)
-        if self.Theta is not None:
-            h = h @ self.Theta.T                   # (B, r)
-        delta_out = h @ X.T                        # (B, d_out)
-        delta_out = delta_out * self.alpha
-        return base_out + delta_out
-
-    def get_stable_rank(self) -> float:
-        return compute_stable_rank(self.get_delta_W())
-
-
-class OrthoLoRAMLP4Wrapper(nn.Module):
-    """Wraps a 4-layer MLP with OrthoLoRA adapters on the two middle layers."""
-    def __init__(self, pretrained_mlp: MLP4, rank: int, trainable_theta: bool = False):
-        super().__init__()
-        self.model = pretrained_mlp
-
-        # Freeze base model
-        for p in self.model.parameters():
-            p.requires_grad = False
-
-        # Inject Ortho-LoRA into layers 1 and 2
-        self.lora1 = OrthoLoRALayer(self.model.layers[1], rank=rank, trainable_theta=trainable_theta)
-        self.lora2 = OrthoLoRALayer(self.model.layers[2], rank=rank, trainable_theta=trainable_theta)
-
-        self.model.layers[1] = self.lora1
-        self.model.layers[2] = self.lora2
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
-
-    def get_avg_sr(self) -> float:
-        return (self.lora1.get_stable_rank() + self.lora2.get_stable_rank()) / 2.0
 
 # ============================================================
 # Experiment A: The Implicit Low-SR Bias (Expressivity)
@@ -1031,12 +929,388 @@ def run_exp_c_generalization(
     print(f"\nResults saved to {save_dir}")
     sys.stdout.flush()
 
+
+# ============================================================
+# Experiment D: Generalization Gap vs. Stable Rank (Classification)
+# ============================================================
+
+def run_exp_d_generalization(
+    input_dim: int = 128,
+    hidden_dim: int = 128,
+    num_classes: int = 128,
+    ranks: List[int] = [4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128],
+    conditions: dict = None,
+    train_samples: int = 2048,
+    val_samples: int = 10240,
+    noise_std: float = 0.01,
+    batch_size: int = 32,
+    epochs: int = 200,
+    lr: float = 1e-3,
+    n_seeds: int = 1,
+    device: str = "cuda" if torch.cuda.is_available() else "cpu",
+    n_layers: int = 5,
+    # shift_layers: List[int] = [1,2,3,4,5,6,7,8],
+    # adapter_layers: List[int] = [1,2,3,4,5,6,7,8],
+    shift_layers: List[int] = [1,2,3],
+    adapter_layers: List[int] = [1,2,3],
+    shift_multiplier: float = 0.03,
+    save_dir: str = "results/toy_exp_d/num_layers_5/num_classes_128/n_train_2048",
+):
+    """
+    Experiment D: Classification setup matching the PAC-Bayes Margin Theorem.
+    Teacher generates logits; we add noise and take argmax to create hard labels.
+    Student is trained with CrossEntropyLoss.
+    Generalization gap is measured as 0-1 Error Gap: (Val Error) - (Train Error).
+    Includes Full Fine-Tuning baseline.
+    """
+    if conditions is None:
+        conditions = {
+            "c1": 1,
+            "c2": 1.5,
+            "c3": 2,
+            "c4": 3.0,
+            "c5": 5.0,
+            "c6": 8.0,
+            "c7": 12.0,
+            "c8": 20.0,
+        }
+
+    print(f"\n{'='*60}")
+    print(f"Experiment D: SR Generalization Gap (Classification)")
+    print(f"  conditions={conditions}, ranks={ranks}, n_seeds={n_seeds}")
+    print(f"  num_classes={num_classes}, input_dim={input_dim}")
+    print(f"{'='*60}")
+    os.makedirs(save_dir, exist_ok=True)
+
+    # ------------------------------------------------------------------
+    # Deterministic teacher base (seed 0)
+    # ------------------------------------------------------------------
+    torch.manual_seed(0)
+    student_base = make_mlp(n_layers, input_dim, hidden_dim, output_dim=num_classes).to(device)
+
+    ce_loss_fn = nn.CrossEntropyLoss()
+
+    def evaluate_error(model, x, y):
+        """Returns 0-1 error (1.0 - accuracy)"""
+        model.eval()
+        with torch.no_grad():
+            logits = model(x)
+            preds = torch.argmax(logits, dim=1)
+            acc = (preds == y).float().mean().item()
+        return 1.0 - acc
+
+    # Helper to generate shifts safely for ANY layer shape (including the last one)
+    def _generate_shape_aware_shift(out_features: int, in_features: int, sr_mult: float) -> torch.Tensor:
+        rank = min(out_features, in_features)
+        U = torch.randn(out_features, rank, device=device)
+        V = torch.randn(rank, in_features, device=device)
+        
+        U, _ = torch.linalg.qr(U)
+        V, _ = torch.linalg.qr(V.T)
+        V = V.T
+        
+        S = torch.ones(rank, device=device) + torch.randn(rank, device=device) * 0.1
+        S[0] = sr_mult
+        S = S / torch.norm(S)
+        return U @ torch.diag(S) @ V
+
+    # ------------------------------------------------------------------
+    # Measure and log the target SR for each condition
+    # ------------------------------------------------------------------
+    target_srs: Dict[str, float] = {}
+    for label, sr_mult in conditions.items():
+        torch.manual_seed(0)
+        shifts = []
+        for idx in shift_layers:
+            out_f, in_f = student_base.layers[idx].weight.shape
+            shifts.append(_generate_shape_aware_shift(out_f, in_f, sr_mult) * shift_multiplier)
+            
+        avg_target_sr = sum(compute_stable_rank(s) for s in shifts) / len(shifts)
+        target_srs[label] = float(avg_target_sr)
+        print(f"  Condition '{label}' (sr_mult={sr_mult}): "
+              f"target shift avg SR = {avg_target_sr:.2f}")
+    sys.stdout.flush()
+
+    # ------------------------------------------------------------------
+    # Outer sweep: seeds → conditions → ranks
+    # ------------------------------------------------------------------
+    results: Dict[str, Dict] = {}
+
+    for seed in range(n_seeds):
+        torch.manual_seed(seed + 100)
+
+        for label, sr_mult in conditions.items():
+            # ---- Build teacher for this condition ----
+            teacher_cond = copy.deepcopy(student_base)
+            
+            with torch.no_grad():
+                for idx in shift_layers:
+                    out_f, in_f = teacher_cond.layers[idx].weight.shape
+                    s = _generate_shape_aware_shift(out_f, in_f, sr_mult) * shift_multiplier
+                    # Scale shift proportionally to original layer weights
+                    teacher_cond.layers[idx].weight.data.add_(s * ((teacher_cond.layers[idx].weight ** 2).mean()**0.5))
+
+            # ---- Generate classification data ----
+            x_train = torch.randn(train_samples, input_dim, device=device)
+            with torch.no_grad():
+                logits_train = teacher_cond(x_train).detach() + noise_std * torch.randn(train_samples, num_classes, device=device)
+                y_train = torch.argmax(logits_train, dim=1)
+
+            x_val = torch.randn(val_samples, input_dim, device=device)
+            with torch.no_grad():
+                logits_val = teacher_cond(x_val).detach() + noise_std * torch.randn(val_samples, num_classes, device=device)
+                y_val = torch.argmax(logits_val, dim=1)
+
+            # ---- Train full fine-tuning baseline ----
+            run_key = f"{label}_full_ft_seed{seed}"
+            print(f"\n  --- Run: {run_key} (Full Fine-Tuning) ---")
+            sys.stdout.flush()
+            
+            fresh_mlp_ft = copy.deepcopy(student_base)
+            
+            initial_weights = {}
+            for idx in adapter_layers:
+                initial_weights[idx] = fresh_mlp_ft.layers[idx].weight.data.clone()
+            
+            for name, param in fresh_mlp_ft.named_parameters():
+                param.requires_grad = False
+            
+            for idx in adapter_layers:
+                fresh_mlp_ft.layers[idx].weight.requires_grad = True
+                if fresh_mlp_ft.layers[idx].bias is not None:
+                    fresh_mlp_ft.layers[idx].bias.requires_grad = True
+            
+            optimizer_ft = optim.AdamW(
+                [p for p in fresh_mlp_ft.parameters() if p.requires_grad],
+                lr=lr, weight_decay=0.01, # Standard weight decay for classification
+            )
+            
+            N_train = x_train.size(0)
+            for epoch in range(epochs):
+                fresh_mlp_ft.train()
+                perm = torch.randperm(N_train, device=device)
+                for i in range(0, N_train, batch_size):
+                    idx_batch = perm[i: min(i + batch_size, N_train)]
+                    pred_logits = fresh_mlp_ft(x_train[idx_batch])
+                    loss = ce_loss_fn(pred_logits, y_train[idx_batch])
+                    optimizer_ft.zero_grad()
+                    loss.backward()
+                    optimizer_ft.step()
+                
+                if epoch % 1000 == 0 and epoch > 0:
+                    train_err = evaluate_error(fresh_mlp_ft, x_train, y_train)
+                    print(f"    Epoch {epoch:5d} | train 0-1 Error: {train_err:.4f}")
+                    sys.stdout.flush()
+            
+            train_err_ft = evaluate_error(fresh_mlp_ft, x_train, y_train)
+            val_err_ft = evaluate_error(fresh_mlp_ft, x_val, y_val)
+            
+            srs = []
+            with torch.no_grad():
+                for idx in adapter_layers:
+                    weight_diff = fresh_mlp_ft.layers[idx].weight.data - initial_weights[idx]
+                    srs.append(compute_stable_rank(weight_diff))
+            
+            avg_sr_ft = sum(srs) / len(srs) if srs else 0.0
+            gap_ft = val_err_ft - train_err_ft
+            
+            results[run_key] = {
+                'condition': label,
+                'rank': 'full_ft',
+                'seed': int(seed),
+                'train_error': float(train_err_ft),
+                'val_error': float(val_err_ft),
+                'gap': float(gap_ft),
+                'avg_sr': float(avg_sr_ft),
+            }
+            
+            print(f"  [{run_key}] train_err={train_err_ft:.4f} | val_err={val_err_ft:.4f} | gap={gap_ft:+.4f} | SR={avg_sr_ft:.3f}")
+            sys.stdout.flush()
+            del fresh_mlp_ft
+            
+            # ---- Train LoRA at each rank ----
+            for r in ranks:
+                run_key = f"{label}_r{r}_seed{seed}"
+                print(f"\n  --- Run: {run_key} ---")
+                sys.stdout.flush()
+
+                fresh_mlp = copy.deepcopy(student_base)
+                student = LoRAFlexWrapper(fresh_mlp, rank=r, adapter_layers=adapter_layers).to(device)
+
+                optimizer = optim.AdamW(
+                    [p for p in student.parameters() if p.requires_grad],
+                    lr=lr, weight_decay=0.01,
+                )
+
+                for epoch in range(epochs):
+                    student.train()
+                    perm = torch.randperm(N_train, device=device)
+                    for i in range(0, N_train, batch_size):
+                        idx_batch = perm[i: min(i + batch_size, N_train)]
+                        pred_logits = student(x_train[idx_batch])
+                        loss = ce_loss_fn(pred_logits, y_train[idx_batch])
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+
+                train_err = evaluate_error(student, x_train, y_train)
+                val_err = evaluate_error(student, x_val, y_val)
+                avg_sr = student.get_avg_sr()
+                gap = val_err - train_err
+
+                results[run_key] = {
+                    'condition': label,
+                    'rank': int(r),
+                    'seed': int(seed),
+                    'train_error': float(train_err),
+                    'val_error': float(val_err),
+                    'gap': float(gap),
+                    'avg_sr': float(avg_sr),
+                }
+
+                print(f"  [{run_key}] train_err={train_err:.4f} | val_err={val_err:.4f} | gap={gap:+.4f} | SR={avg_sr:.3f}")
+                sys.stdout.flush()
+
+                del student, fresh_mlp
+            del teacher_cond
+
+    # ------------------------------------------------------------------
+    # Save results + metadata
+    # ------------------------------------------------------------------
+    output = {
+        'metadata': {
+            'conditions': conditions,
+            'target_srs': target_srs,
+            'noise_std': noise_std,
+            'train_samples': train_samples,
+            'val_samples': val_samples,
+            'batch_size': batch_size,
+            'epochs': epochs,
+            'n_seeds': n_seeds,
+            'ranks': ranks,
+            'hidden_dim': hidden_dim,
+            'input_dim': input_dim,
+            'num_classes': num_classes,
+            'task': 'classification'
+        },
+        'results': results,
+    }
+    with open(os.path.join(save_dir, 'results.json'), 'w') as f:
+        json.dump(output, f, indent=2)
+
+    # ------------------------------------------------------------------
+    # Plotting & Aggregation
+    # ------------------------------------------------------------------
+    ranks_arr = np.array(ranks, dtype=float)
+
+    def _agg(cond_label, rank, field):
+        if rank == 'full_ft':
+            vals = [results[f"{cond_label}_full_ft_seed{s}"][field] for s in range(n_seeds)]
+        else:
+            vals = [results[f"{cond_label}_r{rank}_seed{s}"][field] for s in range(n_seeds)]
+        return np.array(vals, dtype=float)
+
+    cond_labels = list(conditions.keys())
+    cond_colors  = {'c1': 'tab:red', 'c2': 'tab:blue', 'c3': 'tab:green', 'c4': 'tab:orange', 'c5': 'tab:purple', 'c6': 'tab:brown', 'c7': 'tab:pink', 'c8': 'tab:gray'}
+    # fallback
+    default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for i, lbl in enumerate(cond_labels):
+        if lbl not in cond_colors:
+            cond_colors[lbl] = default_colors[i % len(default_colors)]
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    ax1, ax2, ax3, ax4 = axes.flatten()
+
+    # ---- Panel 1: Trained SR vs rank ----
+    for lbl in cond_labels:
+        color = cond_colors[lbl]
+        sr_mean = np.array([_agg(lbl, r, 'avg_sr').mean() for r in ranks])
+        sr_std  = np.array([_agg(lbl, r, 'avg_sr').std()  for r in ranks])
+        ax1.errorbar(ranks_arr, sr_mean, yerr=sr_std, color=color, marker='o', capsize=3, label=f"{lbl} (target SR≈{target_srs[lbl]:.1f})")
+        try:
+            ft_sr_mean = _agg(lbl, 'full_ft', 'avg_sr').mean()
+            ax1.axhline(y=ft_sr_mean, color=color, linestyle='--', alpha=0.7)
+        except: pass
+
+    ax1.set_xlabel('Nominal rank')
+    ax1.set_ylabel('Trained adapter avg SR')
+    ax1.set_title('Trained adapter SR vs nominal rank')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(fontsize=9)
+
+    # ---- Panel 2: Generalization gap vs rank ----
+    for lbl in cond_labels:
+        color = cond_colors[lbl]
+        gap_mean = np.array([_agg(lbl, r, 'gap').mean() for r in ranks])
+        gap_std  = np.array([_agg(lbl, r, 'gap').std()  for r in ranks])
+        ax2.errorbar(ranks_arr, gap_mean, yerr=gap_std, color=color, marker='o', capsize=3, label=lbl)
+        try:
+            ft_gap_mean = _agg(lbl, 'full_ft', 'gap').mean()
+            ax2.axhline(y=ft_gap_mean, color=color, linestyle='--', alpha=0.7)
+        except: pass
+
+    ax2.set_xlabel('Nominal rank')
+    ax2.set_ylabel('0-1 Error Gap (Val - Train)')
+    ax2.set_title('0-1 Error Gap vs Nominal Rank')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(fontsize=9)
+
+    # ---- Panel 3: Gap vs √(trained SR) ----
+    for lbl in cond_labels:
+        color = cond_colors[lbl]
+        avg_sr_vals  = np.array([_agg(lbl, r, 'avg_sr').mean() for r in ranks])
+        gap_vals     = np.array([_agg(lbl, r, 'gap').mean()    for r in ranks])
+        sqrt_sr_vals = np.sqrt(np.maximum(avg_sr_vals, 0.0))
+        sort_idx     = np.argsort(sqrt_sr_vals)
+        
+        ax3.plot(sqrt_sr_vals[sort_idx], gap_vals[sort_idx], marker='o', color=color, label=lbl)
+        try:
+            ft_sr = _agg(lbl, 'full_ft', 'avg_sr').mean()
+            ft_gap = _agg(lbl, 'full_ft', 'gap').mean()
+            ax3.plot(np.sqrt(max(ft_sr, 0.0)), ft_gap, '*', color=color, markersize=12, label=f"{lbl} Full FT")
+        except: pass
+
+    ax3.set_xlabel(r'$\sqrt{\mathrm{SR}(\Delta W)}$')
+    ax3.set_ylabel('0-1 Error Gap (Val - Train)')
+    ax3.set_title('Classification Gap vs \u221a(trained SR)')
+    ax3.grid(True, alpha=0.3)
+    ax3.legend(fontsize=9)
+
+    # ---- Panel 4: Gap vs √(nominal rank) ----
+    for lbl in cond_labels:
+        color    = cond_colors[lbl]
+        gap_mean = np.array([_agg(lbl, r, 'gap').mean() for r in ranks])
+        ax4.plot(np.sqrt(ranks_arr), gap_mean, marker='o', color=color, label=lbl)
+        try:
+            ft_gap_mean = _agg(lbl, 'full_ft', 'gap').mean()
+            ax4.axhline(y=ft_gap_mean, color=color, linestyle='--', alpha=0.7)
+        except: pass
+
+    ax4.set_xlabel(r'$\sqrt{rank}$')
+    ax4.set_ylabel('0-1 Error Gap (Val - Train)')
+    ax4.set_title('Classification Gap vs \u221a(rank)')
+    ax4.grid(True, alpha=0.3)
+    ax4.legend(fontsize=9)
+
+    fig.suptitle(
+        f"Exp D (Classification) | noise_std={noise_std}, N_train={train_samples}, epochs={epochs}\n"
+        f"n_layers={n_layers} | shift={shift_layers} | adapter={adapter_layers}",
+        fontsize=12,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    fig.savefig(os.path.join(save_dir, 'exp_d_results.png'), dpi=120)
+    plt.close(fig)
+
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp', type=str, default='all', choices=['a', 'b', 'c', 'all'])
+    parser.add_argument('--exp', type=str, default='all', choices=['a', 'b', 'c', 'd', 'all'])
     args = parser.parse_args()
     
     if args.exp in ['a', 'all']: run_exp_a_expressivity()
     if args.exp in ['b', 'all']: run_exp_b_target_sr()
     if args.exp in ['c', 'all']: run_exp_c_generalization()
+    if args.exp in ['d', 'all']: run_exp_d_generalization()
+

@@ -19,6 +19,7 @@
 \usepackage{amsmath,amsfonts,amssymb,amsthm,mathtools}
 \usepackage{caption}
 \usepackage{float}
+\usepackage{wrapfig}
 \usepackage{subcaption}
 \usepackage{xcolor}
 \usepackage{amsthm}
@@ -42,8 +43,10 @@
 \title{Stable Rank Based Analysis of Low-Rank Adaptation: Tighter Expressivity and Generalization Bounds}
 
 \author{Nikita Okhotnikov\\
-	\texttt{okhotnikov.nv@phystech.edu} \\
-	Moscow Institute of Physics and Technology \\
+	MIPT \\
+\and
+	Andrey Grabovoy\\
+	MIPT \\
 }
 \date{}
 
@@ -80,8 +83,7 @@ pdfauthor={Nikita Okhotnikov},
         In this paper, we propose stable rank as a more appropriate theoretical measure for analyzing LoRA's properties. 
         We derive fundamental limits on single matrix approximation under stable rank constraint, extend these to expressivity bounds for fully connected networks and transformers. 
         Additionally, we prove a tighter generalization bound proportional to $\sqrt{\sr(\Delta W)}$ rather than previous best $\sqrt{\rank(\Delta W)}$ from the literature, using a PAC-Bayesian framework. 
-        Our empirical validation additionally confirms that LoRA exhibits implicit bias toward low stable rank solutions both in small scale toy setup and on actual downstream tasks with pretrained LLM. 
-        We also validate our theoretical findings and demonstrate via controlled experiments on synthetic data that $\mathcal{O}(\sqrt{\sr(\Delta W)})$ is more practical estimate for generalization gap.
+        We manage to validate our theoretical findings and demonstrate via controlled experiments on synthetic data that $\mathcal{O}(\sqrt{\sr(\Delta W)})$ is more practical estimate for generalization gap. Our experiments additionally confirms that lora exhibits some implicit bias toward lower stable rank solutions even when the rank of the adapter becomes as large as the width of the frozen layer.
     \end{abstract}
 
     \tableofcontents
@@ -610,47 +612,55 @@ pdfauthor={Nikita Okhotnikov},
     
     The theorem formalizes how applying LoRA to the Query, Key, Value, and Output projection matrices restricts the adaptability of the attention head according to the stable rank limit. Even though the frozen base matrices retain their full rank, steering the attention mechanism toward a significantly different target function might require a high-SR matrix. If the downstream data intrinsically demands high stable rank updates to form new associations between tokens, an optimization trajectory that implicitly biases toward low sr solutions will fundamentally cap the Transformer's representational accuracy. This mathematical bottleneck suggests a strong hypothesis for the performance plateaus often observed empirically at high nominal ranks: real expressivity scales primarily with stable rank rather than algebraic rank, meaning that simply increasing the parameter budget $r$ yields diminishing returns if the effective dimension of the update remains constricted by the optimization algorithm.
 
+
+
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     \subsection{Generalization Analysis}
 
     Understanding generalization -- why a model performs well on unseen data despite being most of the times massively overparameterized -- is a central pursuit in deep learning theory. The work of Kratsios et al. \cite{kratsios2025sharpgeneralizationboundsfoundation} recently established generalization bounds for low-rank adapters in terms of rank and sample complexity. Their upper bound scales as $\mathcal{O}(\sqrt{r/N})$, where $r$ is the nominal adapter rank and $N$ is the sample size. This bound, derived from worst-case estimates of rank-$r$ matrices, theoretically suggests that generalization degrades proportionally as one increases the nominal rank. 
     
-    However, this analysis relies purely on structural constraints and does not account for the continuous spectral structure or energy distribution of the learned adapters. The gap between Kratsios et al.'s bound and empirical performance (where larger ranks often do not overfit as aggressively as predicted) stems directly from their worst-case analysis assumptions. Bounds relying purely on algebraic rank are mathematically tight only when all $r$ singular values are roughly equal ($\sigma_1 = \sigma_2 = \cdots = \sigma_r$), representing the maximum entropy distribution under a rank constraint. Because LoRA optimization empirically collapses into highly skewed distributions with low stable rank, evaluating complexity purely by nominal rank vastly overestimates the capacity of the model. 
+    However, this analysis relies purely on structural constraints and does not account for the continuous spectral structure or energy distribution of the learned adapters. The gap between Kratsios et al.'s bound and empirical performance (where larger ranks often do not overfit as aggressively as predicted) stems directly from their worst-case analysis assumptions. Bounds relying purely on algebraic rank are mathematically tight only when all $r$ singular values are roughly equal ($\sigma_1 \approx \sigma_2 \approx \cdots \approx \sigma_r$), representing the maximum entropy distribution under a rank constraint. As LoRA optimization empirically often collapses into highly skewed distributions with low stable rank, evaluating complexity purely by nominal rank vastly overestimates the capacity of the model and the resulting generaization gap is pessimistically high.
     
-    In this section, we rigorously prove that the generalization bound can be significantly tightened by directly substituting nominal rank with stable rank, leveraging the PAC-Bayesian framework.
+    In this section, we rigorously prove that the generalization bound can be tightened by indtriducing a stable rank rank constraint. Specifically, we prove that our proxy function for generalization gap scales with $\sqrt{\sr}$ rather than $\sqrt{\rank}$ leveraging the similar PAC-Bayesian pipeline.
+
+
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     \subsubsection{PAC-Bayesian Framework Integration}
 
-    The PAC-Bayesian framework \cite{mcallester1999pac, mcallester2003simplified, shawe1997pac} provides an elegant and powerful tool for deriving generalization bounds. Unlike VC-dimension or Rademacher complexity bounds--which count combinatorial capacity--PAC-Bayes provides data-dependent bounds that can natively incorporate prior knowledge about the hypothesis space. This is uniquely crucial for analyzing fine-tuning, where the massive pretrained model acts as a highly informative prior.
+    The PAC-Bayesian framework \cite{mcallester1999pac, mcallester2003simplified, shawe1997pac} provides an elegant and powerful tool for deriving generalization bounds. Unlike VC-dimension or Rademacher complexity bounds---which evaluate the combinatorial capacity of an entire hypothesis class---PAC-Bayes provides data-dependent bounds that can natively incorporate prior knowledge about the hypothesis space. This is uniquely crucial for analyzing fine-tuning.
 
-    The key mechanism bounds the generalization gap through the Kullback-Leibler (KL) divergence $KL(\mathcal{Q} || \mathcal{P})$ between a posterior distribution $\mathcal{Q}$ (distribution over fine-tuned weights) and a prior $\mathcal{P}$ (distribution over pretrained weights). For LoRA adaptation, if we set $\mathcal{P} = \prod_t \mathcal{N}(W_{0,t}, \tau_t^2 I)$ and $\mathcal{Q} = \prod_t \mathcal{N}(W_{0,t} + \Delta W_t, \tau_t^2 I)$, the KL divergence cleanly reduces to a sum of squared Frobenius norms: $KL(\mathcal{Q} || \mathcal{P}) = \sum_t \frac{\|\Delta W_t\|_F^2}{2\tau_t^2}$.
+    The key mechanism bounds the generalization gap through the Kullback-Leibler (KL) divergence $KL(\mathcal{Q} || \mathcal{P})$ between a reference distribution $\mathcal{P}$ and a learned distribution $\mathcal{Q}$ over the network's weights. In the PAC-Bayes literature, $\mathcal{P}$ and $\mathcal{Q}$ are conventionally termed the <<prior>> and <<posterior>> distributions. However, it is important to note that these do not represent a strict Bayesian inference update (i.e., $P(\theta|D) \propto P(D|\theta)P(\theta)$). Rather, $\mathcal{P}$ can be any distribution chosen \textit{before} observing the training data, and $\mathcal{Q}$ can be any distribution chosen afterward. 
+    
+    For evaluating LoRA, we define our prior $\mathcal{P}$ as an isotropic Gaussian centered on the frozen pretrained weight matrices $W_{0,t}$ at each layer $t$: $\mathcal{P} = \prod_t \mathcal{N}(W_{0,t}, \tau_t^2 I)$, where $\tau_t$ is a layer-wise variance hyperparameter and $I$ is the identity matrix. For the posterior $\mathcal{Q}$, we center the distribution on the final adapted weights $W_{0,t} + \Delta W_t$, where $\Delta W_t$ is the learned LoRA adapter, yielding $\mathcal{Q} = \prod_t \mathcal{N}(W_{0,t} + \Delta W_t, \tau_t^2 I)$. Under this formulation, the KL divergence cleanly reduces to a sum of squared Frobenius norms: $KL(\mathcal{Q} || \mathcal{P}) = \sum_t \frac{\|\Delta W_t\|_F^2}{2\tau_t^2}$.
 
-    While previous works \cite{bartlett2017spectrally, neyshabur2017pac} have shown that generalization depends on the product of spectral norms across layers, our key insight is that the Frobenius norm inherently decomposes as $\|\Delta W\|_F^2 = \|\Delta W\|_{op}^2 \cdot \sr(\Delta W)$. This exact identity allows us to substitute the worst-case bound $\|\Delta W\|_F^2 \leq \Lambda^2 r$ with the precise bound $\|\Delta W\|_F^2 \leq \Lambda^2 S$. This provides a direct, continuous link between the stable rank of the adapter and the network's generalization capability. 
+    While Neyshabur et al. \cite{neyshabur2017pac} originally utilized this PAC-Bayesian formulation to analyze standard, full-rank feed-forward networks, adapting their framework to LoRA fine-tuning naturally isolates the Frobenius norm of the adapters themselves: $\|\Delta W_t\|_F^2$. If one were to naively bound the capacity of these adapters, the standard approach would rely on their algebraic rank $r$, substituting the Frobenius norm with the worst-case volumetric bound $\|\Delta W_t\|_F^2 \leq \Lambda_t^2 r$ (where $\Lambda_t$ bounds the spectral norm). However, as Frobenius norm, by definition of stable rank, decomposes as $\|\Delta W_t\|_F^2 = \|\Delta W_t\|_{op}^2 \cdot \sr(\Delta W_t)$, we can directly replace this by $\|\Delta W_t\|_F^2 \leq \Lambda_t^2 S_l$, where $S_l$ is the stable rank constraint for layer $l$. 
+
+    
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     \subsubsection{Notation}
     
-    In this section we use a setting similar to the one described in \cite{kratsios2025sharpgeneralizationboundsfoundation}. Consider a depth-$T$ linear network $f_{W_0}$ with 1-Lipschitz activation functions $\sigma(.)$ such that $\sigma(0) = 0$, pre-trained weights $W_{0}$ and $W_{0,t}\in \mathbb{R}^{d_{t-1}\times d_{t}}$ weight matrices for each layer.
-    LoRA is applied via matrices $\Delta W_t = B_t(A_t)^T$, so that $W_t = W_{0,t} + \Delta W_t$. We denote the resulting network $f_W$. 
+    In this section, we use a setting similar to the one described in \cite{kratsios2025sharpgeneralizationboundsfoundation} and expressivity section above. Consider a depth-$T$ feed-forward neural network $f_{W_0}$ with 1-Lipschitz activation functions $\sigma(\cdot)$ such that $\sigma(0) = 0$. The pre-trained network is parameterized by weight matrices $W_{0,t} \in \mathbb{R}^{d_{t-1}\times d_{t}}$ for each layer $t$.
+    LoRA is applied via matrices $\Delta W_t = B_t(A_t)^T$, so that the updated weights are $W_t = W_{0,t} + \Delta W_t$. We denote the resulting adapted network as $f_W$. 
 
-    We consider the multi-label classification problem with unknown data distribution $\mathcal{D}$ and the set of i.i.d. samples $S = \{(x_1, y_1), \dots, (x_N, y_N)\}$, such that $\|x_i\|_2\leqslant B_x$, $y_i \in \{1, \dots, K\}$. For input x we also denote intermediate states
-    $h_0 = x$, $h_t = \sigma(W_t h_{t-1})$, $f_W(x) = h_T$.
+    We consider the multi-label classification problem with an unknown data distribution $\mathcal{D}$ and a set of samples $S = \{(x_1, y_1), \dots, (x_N, y_N)\}\sim \mathcal{D}$, such that $\|x_i\|_2 \leqslant B_x$ and $y_i \in \{1, \dots, K\}$. For an input $x$, we denote the intermediate forward-pass states as
+    $h_0 = x$ and $h_t = \sigma(W_t h_{t-1})$, with the final network output being $f_W(x) = h_T$.
     
-    Additionally, we require limited spectral norm for the network before and after the adaptation: \\
-    $\|W_{0,t}\|_{op} \leqslant B_t$, $\|\Delta W_t\|_{op} \leqslant \Lambda_t$, $\|W\|_{op} \leqslant \bar{\beta}_t = B_t + \Lambda_t$
-    and assume, that stable rank of adapters is bounded by some constant $\sr(\Delta W_t) \le S_t$. Maximum layer width: $d_{max} = \max_t (d_t)$.
-    The maximum number of parameters in layer: $D_{max} = \max_t (d_t \cdot d_{t-1})$.\\
+    Additionally, we require limited spectral norms for the network before and after the adaptation: \\
+    $\|W_{0,t}\|_{op} \leqslant B_t$, $\|\Delta W_t\|_{op} \leqslant \Lambda_t$, and $\|W_t\|_{op} \leqslant \bar{\beta}_t = B_t + \Lambda_t$. We assume that the stable rank of the adapters is bounded by a constant $\sr(\Delta W_t) \leqslant S_t$. The maximum layer width across the network is denoted as $d_{max} = \max_t (d_t)$, and the maximum number of parameters in any layer is $D_{max} = \max_t (d_t \cdot d_{t-1})$.\\
 
-    For the main result in this section we use the \textit{Margin Loss}. First we define the margin $m$ for model $f_W$ and data point $(x, y)$ as follows:
+    For the main result in this section we use the \textit{Margin Loss}. First, we define the margin $m$ for the model $f_W$ and a data point $(x, y)$ as follows:
     $$ m(f_W(x), y) = f_W(x)_y - \max_{j \neq y} f_W(x)_j $$
-    Then the true $\gamma$-margin error for $f_W$:
-    $$L_\gamma(W) = \mathbb{P}_{(x,y)}\left[ m(f_W(x), y) \le \gamma \right]$$
-    Then $L_0$ is the expected incorrect classification probability for the network or the true risk function. \\
-    And the empirical $\gamma$-margin error:
-    $$\widehat{L}_\gamma(W) = \frac{1}{N} \sum_{i=1}^N \mathbb{I}\left[ m(f_W(x_i), y_i) \le \gamma \right]$$ \\   
-    
+    Then the true $\gamma$-margin error for $f_W$ is defined as:
+    $$L_\gamma(W) = \mathbb{P}_{(x,y) \sim \mathcal{D}}\left[ m(f_W(x), y) \leqslant \gamma \right]$$
+    Here, $L_0(W)$ represents the expected incorrect classification probability for the network (the true risk function). \\
+    The empirical $\gamma$-margin error over the training set is:
+    $$\widehat{L}_\gamma(W) = \frac{1}{N} \sum_{i=1}^N \mathbb{I}\left[ m(f_W(x_i), y_i) \leqslant \gamma \right]$$
 
+
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     \subsubsection{Upper-bound for LoRA Generalization Gap}
 
     The following theorem formally derives the generalization bound incorporating the layer-wise stable rank constants $S_t$. The result isolates exactly how reducing stable rank acts as a powerful regularizer, naturally minimizing the generalization gap independently of the nominal dimensions.
@@ -816,105 +826,147 @@ pdfauthor={Nikita Okhotnikov},
 
     \end{proof}
 
-    Theorem 3 demonstrates mathematically why tuning large LoRA ranks rarely leads to catastrophic overfitting, despite adding millions of parameters. The generalization gap correlates tightly with the stable rank sum $\sum_t \Lambda_t^2 S_t / \bar{\beta}_t^2$. Even if the nominal rank $r$ is arbitrarily large, if the training dynamics implicitly bias the updates toward highly skewed singular value distributions (meaning $S_t \ll r$), the PAC-Bayesian bound naturally absorbs this regularization. Furthermore, the term $\Lambda_t^2 / \bar{\beta}_t^2$ measures the relative magnitude of the adapter perturbation compared to the total layer norm. This indicates that as long as the adapter is a relatively small additive correction with highly concentrated energy, the generalization gap remains constrained.
+    While the derived PAC-Bayesian bound remains purely theoretical and potentially quite loose compared to practical applications -- as it aggregates worst-case layer-wise perturbations without fully accounting for complex cross-layer interactions -- Theorem 3 provides a valuable theoretical perspective on the generalization dynamics of LoRA. The bound suggests a mathematical rationale for why tuning large nominal ranks not necessarily leads to catastrophic overfitting in practice. Within this framework, the generalization gap correlates fundamentally with the stable rank sum rather than the algebraic rank $r$. If the training dynamics implicitly bias the adapter updates toward highly skewed singular value distributions ($\sr \ll \rank $), the effective capacity of the network remains tightly constrained regardless of the parameter budget. Consequently, this stable-rank dependence offers a theoretical hypothesis for how LoRA resists overfitting, suggesting that monitoring stable rank could serve as a useful diagnostic tool for predicting and analyzing generalization performance across different optimization techniques or architectural modifications.
+
+    Before concluding this section, we must acknowledge a slight formal distinction between our PAC-Bayesian analysis and the framework established by Kratsios et al. \cite{kratsios2025sharpgeneralizationboundsfoundation}. While their uniform convergence bound explicitly targets the standard generalization gap (the absolute difference between empirical and expected risk) for a bounded 1-Lipschitz loss, our Theorem 3 bounds the true expected classification error $L_0(W)$ using an empirical $\gamma$-margin loss $\widehat{L}_\gamma(W)$. Because these bounds govern slightly different mathematical formulations of the learning objective, they are not strictly one-to-one comparable. 
+    However, within the margin-based framework, the margin parameter $\gamma$ acts as a tunable strictness threshold; by adjusting $\gamma$ to be arbitrarily small, the margin setup can conceptually approximate the standard continuous loss behavior with the required scaling. Most importantly, this shift in the loss definition does not alter the primary comparative takeaway of our analysis: whereas the covering-number approach permanently locks the complexity penalty to the algebraic rank $\mathcal{O}(\sqrt{r/N})$, the PAC-Bayesian margin framework successfully transitions the scaling to the stable rank, proving that the true generalization penalty is governed by the spectral distribution of the adapter rather than its parameter count.
+
 
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     \section{Empirical Validation}
     % ==============================================================================
     % IN SHORT:
-    % [TODO: Write this after conducting and plotting the experiments. 
-    %  - Outline: The section will show that SR is indeed low in practice and that it dictates generalization.
-    %  - Setup 1: Toy synthetic MLP setting showing SR evolution and how SR predicts the generalization gap precisely.
-    %  - Setup 2: LLM fine-tuning (Qwen 0.5B on Text-to-SQL) showing consistent low SR regardless of nominal rank settings.
-    %  - Conclusion: Theory mathematically bounds exactly what happens empirically.]
+    % - Toy experiments on synthetic data validate the main theoretical claim: generalization gap scales with √SR, not √rank.
+    % - 10-layer MLPs in a teacher-student setup; LoRA adapters trained under controlled target shift complexity.
+    % - Regression (vector output, MSE) is cleaner and more stable; classification (0-1 error, CE loss) mirrors Theorem 3 setup.
+    % - Both experiments confirm trained adapter SR saturates far below nominal rank, and generalization gap aligns with √SR across conditions.
+    % - Full fine-tuning baseline consistently shows higher SR and larger generalization gap.
     % ==============================================================================
     
-    % [TODO: Write a general overview paragraph introducing the empirical section.]
-    % - Acknowledge limitations: the bounds calculated in Section 3 are worst-case and multiply layer Lipschitz constants, meaning the raw theoretical numerical values are practically loose (as is standard in deep learning theory).
-    % - State the goal: We aim to empirically validate the scaling laws, the correlation between SR and generalization, and the implicit low-SR bias of optimization.
-    % - Introduce the two experimental setups: (1) The highly controlled toy experiment (synthetic data, explicit target shifts) and (2) Real-world LLM fine-tuning on a downstream task.
+    To empirically validate our theoretical claims---in particular, the generalization bound of Theorem~3 which predicts that the generalization gap scales as $\mathcal{O}(\sqrt{\sr(\Delta W)/N})$ rather than $\mathcal{O}(\sqrt{\rank(\Delta W)/N})$ -- we design controlled synthetic experiments where the complexity of the target adaptation is systematically varied. The core objective is to demonstrate that, across a range of target difficulties, the observed generalization gap of LoRA adapters is practically governed by the trained stable rank, not the nominal adapter rank. We additionally confirm the implicit low-SR bias of LoRA optimization, showing that even when the nominal rank is increased up to the full layer width, the trained stable rank saturates at a value substantially smaller than $r$.
+
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    \subsection{Toy experiment details}
+    \subsection{Experimental Setup}
 
-    % [TODO: Provide in-depth architecture, datasets, training protocols.]
-    % - Detail the MLP architectures (e.g., 10-layer MLP for Experiment C, 128 hidden dim).
-    % - Detail the explicit target shifts (generating \Delta W targets with controlled SR using orthogonal components and steep singular value decay).
-    % - Note the learning rate, optimizer, epochs, and noise injection variance.
-    
-    \noindent\rule{\textwidth}{2pt}
-    
-    % [TODO: Elaborate on the experimental results referencing the figures you will generate. Ensure you emphasize how Experiment C maps beautifully to Theorem 3's predictions regarding SR vs generalization.]
+    \subsubsection*{Network architecture and teacher-student framework}
+
+    We employ a teacher-student setup in which both models share the same MLP architecture of width $D=128$ with $L=10$ linear layers and SiLU activations. The teacher is constructed by taking the (random) student base and manually shifting a subset of its weight layers with a controlled perturbation $\delta_l$. The student is then trained to recover the teacher's outputs on a finite sample, using LoRA adapters injected into those same perturbed layers. Crucially, this is not knowledge distillation (which would involve matching logit distributions via KL divergence); rather, the teacher simply serves as a data-generating process: its inputs and noisy outputs are used as $(x, y)$ training pairs for the student. 
+
+    We deliberately choose a deep 10-layer architecture because preliminary experiments showed that shallower networks do not exhibit the low-SR implicit bias as prominently. That might be because the deeper model better approximates the optimization dynamics of practically used large networks such as LLMs, where the low-SR phenomenon has been documented~\cite{lion2025polar}.
+
+    \subsubsection*{Controlling target complexity via stable rank}
+
+    The key experimental variable is the stable rank of the target weight shift $\delta_l$ applied to each perturbed layer. We generate shifts via a controlled SVD procedure: random orthogonal matrices $U$, $V$ are drawn and $\delta = U \operatorname{diag}(\sigma) V^T$ is constructed with singular values set so that $\sigma_1$ equals a chosen \textbf{shift multiplier} and $\sigma_{i \geqslant 2} \approx 1$, after which the singular value vector is normalized to unit norm. We use eight conditions $c_1$ through $c_8$ corresponding to shift multipliers $\{1.0,\;1.5,\;2.0,\;3.0,\;5.0,\;8.0,\;12.0,\;20.0\}$. A multiplier of $1.0$ produces a shift with stable rank close to the layer width $D$ (all singular values nearly equal), while a multiplier of $20.0$ concentrates virtually all energy in the first singular component, yielding $\sr \approx 1$. Each shift is additionally scaled by a factor ($0.5$ for regression, $0.03$ for classification) and proportionally to the RMS of the base layer weights. This design gives us direct control over the intrinsic complexity of the training signal: a high-SR shift is harder for a student to match because the student's optimizer is implicitly biased toward low-SR solutions.
+
+    \subsubsection*{Training protocol and metrics}
+
+    All experiments use $N_{\text{train}} = 2048$ training samples and $N_{\text{val}} = 10240$ validation samples drawn from a standard normal distribution. Gaussian noise is added to teacher outputs (standard deviation $\sigma_{\text{noise}} = 0.15$ for regression, $0.01$ for classification) to induce overfitting and add some compelixy and diversity. LoRA adapters are trained at nominal ranks $r \in \{4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128\}$, covering the full range up to the layer width. A full fine-tuning (Full FT) baseline is also included, where the same subset of layers is trained without rank constraints. All models are optimized with AdamW for 200 epochs with a learning rate of $10^{-3}$.
+
+    The primary metric is the \textbf{generalization gap}, defined as the difference between validation and training loss. For each trained adapter, we also record the \textbf{average stable rank} $\overline{\sr} = \frac{1}{|\mathcal{L}_{\text{adpt}}|} \sum_{l \in \mathcal{L}_{\text{adpt}}} \sr(\Delta W_l)$ computed directly from the learned $\Delta W_l = B_l A_l$ matrices.
+
+    We conduct two variants of the experiment. The first is a \textbf{regression} task: the teacher outputs a $D$-dimensional real vector, and the student minimizes MSE. The second is a \textbf{classification} task: the teacher produces logits over $K=64$ classes, hard labels are obtained via argmax, and the student is trained with cross-entropy loss; generalization is measured as the 0-1 error gap. Although the regression setup does not replicate the exact formulation of Theorem~3, it is similar enough while being substantially more stable numerically, making it the cleaner demonstration of the core idea. The classification experiment more directly mirrors the theoretical setting of the PAC-Bayesian margin bound. (Runs shown: 2048 training samples with Full FT baseline for regression; 10-layer, 64-class for classification.)
+
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    \subsection{Regression Experiment}
+
+    In the regression variant, the teacher and student both output $D$-dimensional real vectors, with shifts applied to 9 intermediate layers (layers 1 through 9) and LoRA adapters injected into the same layers. Noise with $\sigma_{\text{noise}}=0.15$ is added to the teacher outputs.
+
+    \begin{wrapfigure}{l}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.48\textwidth]{"../figures/regression_trained_sr_vs_nominal_rank.png"}
+        \caption{Trained stable rank versus nominal LoRA rank across target shift conditions.}
+        \label{fig:regr_sr_vs_rank}
+    \end{wrapfigure}
+
+    Figure~\ref{fig:regr_sr_vs_rank} shows that the trained adapter stable rank $\overline{\sr}$ increases with nominal rank $r$ but saturates early -- around $r \approx 32$--$48$ -- and remains nearly flat thereafter, even when $r$ reaches the full layer width of 128. However, saturation alone does not establish an implicit low-SR bias -- it could simply reflect interlayer communication compensating for low per-layer SR. The decisive evidence for the implicit bias is the contrast with Full FT: Full fine-tuning of the network, even though having the same algebraic rank, achieves much higher stable rank and lower training loss, that incurs a larger generalization gap (overfitting), whereas LoRA adapters remain at lower SR with a smaller gap, indicating that the optimization dynamics bound effective capacity in a manner that favors generalization. Notably, the SR curves for all eight conditions are closely clustered together, indicating that the trained SR in this particular scenario is primarily determined by the nominal rank and the optimization process, with the target shift's SR exerting limited influence on the adapter's saturation level. The Full FT baselines (dashed lines) consistently achieve substantially higher stable rank ($\overline{\sr} \approx 27$--$29$) than any LoRA configuration, with also negligible variation across conditions. \\
 
     \begin{figure}[htbp]
         \centering
-        % ===================== HERE SHOULD BE THE FIGURTE FOR SR EVOLUTION EXP A ==================== \\
-        \caption{Experiment A: LoRA's implicit bias toward low stable rank. Left: Training loss decreases with rank. Right: Stable rank evolution shows all LoRA models converge below target SR 38.17, with $r=256$ reaching only SR 31.26 while Full FT reaches 38.17.}
-        \label{fig:exp_a_sr_evolution}
+        \begin{minipage}[t]{0.5\textwidth}
+            \centering
+            \includegraphics[width=\textwidth]{"../figures/regression_gen_gap_vs_sqrt_trained_sr.png"}
+            \caption{Generalization gap versus square root of trained stable rank.}
+            \label{fig:regr_gap_vs_sr}
+        \end{minipage}%
+        \begin{minipage}[t]{0.5\textwidth}
+            \centering
+            \includegraphics[width=\textwidth]{"../figures/regression_gen_gap_vs_sqrt_rank.png"}
+            \caption{Generalization gap versus square root of nominal rank.}
+            \label{fig:regr_gap_vs_rank}
+        \end{minipage}
     \end{figure}
+
+    Figure~\ref{fig:regr_gap_vs_sr} plots the generalization gap (validation MSE $-$ training MSE) against $\sqrt{\overline{\sr}}$. The data points from all conditions and all nominal ranks follow a broadly monotonic trend: higher trained SR is associated with a larger generalization gap. The Full FT points (star markers) lie at the high-SR, high-gap end of the distribution, consistent with their larger effective capacity. This trend is the central empirical finding: the generalization gap is primarily a function of the trained stable rank, not of the nominal parameter budget. \\
+    Figure~\ref{fig:regr_gap_vs_rank} provides the contrast. When the generalization gap is plotted against $\sqrt{r}$, the curves remain closely packed across all conditions -- there is still no separation by condition. Unlike Figure~\ref{fig:regr_gap_vs_sr} where the gap grows with $\sqrt{\overline{\sr}}$, here plotted against $\sqrt{r}$ the gap plateaus: increasing nominal rank does not systematically increase the generalization gap. This reinforces the conclusion from Figure~\ref{fig:regr_gap_vs_sr} that the generalization gap is tied to $\sqrt{\sr}$, not $\sqrt{r}$.
     
-    % [TODO: Write paragraphs detailing Experiment A findings.]
-    
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    \subsection{Classification Experiment}
+
+    The classification variant aligns more closely with the margin-based PAC-Bayesian setup of Theorem~3. The teacher outputs logits over $K=64$ classes; hard labels are obtained by taking argmax of noise-corrupted logits ($\sigma_{\text{noise}}=0.01$). LoRA adapters and shifts are applied to 3 intermediate layers. The generalization gap is measured as the 0-1 error difference (validation error $-$ training error).
+
+    \begin{wrapfigure}{l}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.5\textwidth]{"../figures/classification_trained_sr_vs_nominal_rank.png"}
+        \caption{Trained stable rank versus nominal LoRA rank across target shift conditions.}
+        \label{fig:cls_sr_vs_rank}
+    \end{wrapfigure}
+
+    Figures~\ref{fig:cls_sr_vs_rank}--\ref{fig:cls_gap_vs_rank} show the corresponding results. The classification setting is inherently noisier than regression---a consequence of the discrete 0-1 error surface and the indirect relationship between cross-entropy optimization and the classification margin---yet the same qualitative patterns emerge. Figure~\ref{fig:cls_sr_vs_rank} confirms that the trained SR saturates at values far below the nominal rank (in the range of ~1.4--3.5 across all conditions and ranks). Figure~\ref{fig:cls_gap_vs_sr} reveals that, despite higher variance, the generalization gap exhibits a discernible positive association with $\sqrt{\overline{\sr}}$. Figure~\ref{fig:cls_gap_vs_rank} shows that $\sqrt{r}$ does not provide a consistent predictor and the overall behaviour is closer to the plateau of figure~\ref{fig:regr_gap_vs_rank} than to the noisy growth of generalisation gap vs SR in figure~\ref{fig:cls_gap_vs_sr}.
     \begin{figure}[htbp]
         \centering
-        \includegraphics[width=0.9\textwidth]{"../figures/DUMMY_PLACEHOLDER.png"}
-        \caption{Experiment C: Stable rank as universal generalization predictor. Panel 3 shows linear relationship $\Delta_{gen} \propto \sqrt{\sr(\Delta W)}$ across all conditions, with Full FT points aligning on the same line. Panel 4 shows nominal rank alone fails to predict generalization, as SR plateaus with increasing rank.}
-        \label{fig:exp_c_generalization}
+        \begin{minipage}[t]{0.5\textwidth}
+            \centering
+            \includegraphics[width=\textwidth]{"../figures/classification_gen_gap_vs_sqrt_trained_sr.png"}
+            \caption{Generalization gap versus square root of trained stable rank.}
+            \label{fig:cls_gap_vs_sr}
+        \end{minipage}%
+        \begin{minipage}[t]{0.5\textwidth}
+            \centering
+            \includegraphics[width=\textwidth]{"../figures/classification_gen_gap_vs_sqrt_rank.png"}
+            \caption{Generalization gap versus square root of nominal rank.}
+            \label{fig:cls_gap_vs_rank}
+        \end{minipage}
     \end{figure}
-    
-    % [TODO: Write paragraphs detailing Experiment C findings, focusing on the linearity shown in Panel 3.]
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    \subsection{LLM Experiments}
 
-    % [TODO: Detail the setup for Qwen2.5-0.5B fine-tuning. Mention the Text-to-SQL task, rank parameters (e.g., rank 64, alpha 128), and the layer targeting.]
+    Notably, the observed 0-1 error differences are modest in absolute terms, and the Full FT baseline achieves near-zero training error with a large gap to validation error ($\approx 0.73$--$0.77$), while some of the LoRA adapters achieve substantially smaller gaps. The practical takeaway remains: \textbf{the generalization behavior is better characterized by $\sqrt{\sr(\Delta W)}$ than by $\sqrt{\rank(\Delta W)}$, as predicted by Theorem~3.} The noise in the classification curves underscores that, in settings with discrete losses, the margin-based bound captures a trend rather than an exact functional relationship, and larger-scale experiments would likely be needed for a tighter quantitative verification. \\
 
-    \begin{figure}[htbp]
-        \centering
-        \includegraphics[width=0.8\textwidth]{"../figures/DUMMY_PLACEHOLDER.png"}
 
-        % ===================== HERE SHOULD BE THE FIGURTE FOR LLM SR PER LAYER ==================== \\
-
-        \caption{Per-layer stable rank for Qwen2.5-0.5B with LoRA (rank 64). Stable rank is consistently 2-5 across all layers, significantly lower than nominal rank 64, validating that our theoretical bounds using SR are practically relevant.}
-        \label{fig:llm_sr_per_layer}
-    \end{figure}
-    
-    % [TODO: Write the analysis of the LLM results. Focus on how the stable rank remains bounded tightly within [2, 5] regardless of whether the nominal rank is set to 8, 16, 32, or 64. Note the plateau in downstream performance matching the plateau in SR.]
-    
-
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    \subsection{Analysis}
-
-    % [TODO: Connect empirical results back to the theory.]
-    % - Explain how the small-scale MLP and LLM experiments both validate that \Delta_{gen} scales with \sqrt{SR} (Theorem 3).
-    % - Acknowledge that the expressivity bound (Theorems 1 & 2) is difficult to compute exactly for LLMs but explains the performance plateau.
-    % - Discuss where the bounds are loose (ignoring inter-layer correlation).
-    % - Suggest that monitoring SR during training could serve as an early-stopping metric or a proxy for overfitting.
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    \section{Discussion}
+    \subsection{Analysis and Discussion}
+    \label{sec:analysis}
 
-    % [TODO: Draft the discussion points once the thesis is fully fleshed out.]
-    % - Practical implications: Tracking SR during fine-tuning.
-    % - Open Questions: Why is SR low? Is it a fundamental property of gradient descent in overparameterized regimes? Does the optimizer (AdamW vs SGD vs Muon) dictate this bias? 
-    % - Note that AdamW's coordinate-wise scaling might inherently suppress non-dominant singular directions, whereas something like Muon (which applies orthogonal momentum) might yield a different SR distribution.
-    % - Extendability: How does this apply to other PEFT methods like DoRA or PiSSA? Since they alter initialization but retain low-rank gradients, the SR framework should directly apply.
+    Across both regression and classification, the generalization gap is consistently better predicted by $\sqrt{\overline{\sr}}$. The optimizer's implicit bias toward low-SR solutions is robust to both task type and target complexity: even when the data is generated with high-SR shifts and expected to require higher SR solution, LoRA tends to converge to low-SR ones, even though full fine-tuning consistently produces higher SR updates. Thus, rank thus systematically overestimates LoRA's effective capacity.
+
+    As a future research direction, we would add that beyond post-hoc diagnostics, the SR saturation curve can guide rank selection upfront: by measuring where SR plateaus for a given architecture, practitioners can identify the minimal effective rank without sweeping validation performance across ranks. Additionally, SR provides a unified metric for comparing LoRA variants or optimization techniques -- a higher SR at the same nominal rank apparently indicates better utilization of the allocated parameter budget.
+
+    Extending these measurements to LLM-scale LoRA fine-tuning on NLP benchmarks would test whether the SR--generalization relationship holds at scale. Investigating optimizer-specific effects on the SR distribution could reveal whether the low-SR bias is optimizer-dependent or a deeper property of factored gradient descent.
+
+
 
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     \section{Conclusion}
+
+    % Open Questions: Why is SR low? Is it a fundamental property of gradient descent in overparameterized regimes? Does the optimizer (AdamW vs SGD vs Muon) dictate this bias or some other underlying mechanism for broad class of gradient-based optimization techniques? 
+    % Note that AdamW's coordinate-wise scaling might inherently suppress non-dominant singular directions, whereas something like Muon (which applies orthogonal momentum) might yield a different SR distribution. (or not?)
+    % Extendability: How does this apply to other PEFT methods...? Since they alter initialization but retain low-rank gradients, the SR framework should directly apply. 
+    % Bla-bla other extensions/applications... 
     
-    % [TODO: Write the final conclusion summarizing the paper.]
     
+
     In this thesis, we established stable rank as the mathematically appropriate theoretical measure for analyzing LoRA's properties, correcting the persistent reliance on algebraic rank in existing literature. Our key contributions are:
     
-    \textbf{Fundamental Matrix Limits (Lemmas 1-2):} We derived strict bounds on matrix approximation under stable rank constraints, demonstrating an irreducible Frobenius error when attempting to approximate high-SR targets with low-SR matrices. We provided a constructive optimal bound and the way to reach it.
+    Fundamental Matrix Limits (Lemmas 1-2): We derived strict bounds on matrix approximation under stable rank constraints, demonstrating an irreducible Frobenius error when attempting to approximate high-SR targets with low-SR matrices. We also provied explicit optimal solution to the rank- and stable rank-constrained approximation problem (in terms of minimum Frobenius error).
 
-    \textbf{Expressivity Bounds (Theorems 1-2):} We extended these single-matrix limits to Deep Neural Networks. For FNNs, we proved how the layer-wise SR error $\mathcal{T}_l$ amplifies multiplicatively through network depth. For Transformers, we decomposed the constraint into FFN parameter errors, attention head distortions, and softmax score sensitivities, proving that low-SR attention projections fundamentally cap expressivity.
+    Expressivity Bounds (Theorems 1-2): using derived optimal solution for single-matrix approximation, we extend rank-based expressivity bounds \cite{zeng2024expressivepowerlowrankadaptation} for FNNs and transformers to stable rank-constrained scenario, that is widely common in practice. We claim that our bounds better represent the actual expressivity capacity scaling, even though the exact expression is still way too far from practical application.
+    
 
-    \textbf{Generalization Bounds (Theorem 3):} We leveraged a PAC-Bayesian framework to rigorously prove a tighter generalization gap that scales with $\mathcal{O}(\sqrt{\sum_t \Lambda_t^2 S_t / \bar{\beta}_t^2})$. Because optimization implicitly biases LoRA such that $S_t \ll r_t$, our theorem mathematically validates why massively overparameterized LoRA adapters generalize remarkably well in practice.
+    Generalization Bounds (Theorem 3): We leveraged a PAC-Bayesian framework to rigorously prove a tighter generalization gap that scales with $\mathcal{O}(\sqrt{\sum_t \Lambda_t^2 S_t / \bar{\beta}_t^2})$. Because optimization implicitly biases LoRA such that $S_t \ll r_t$, our theorem mathematically validates why massively overparameterized LoRA adapters generalize remarkably well in practice.
     
     % [TODO: Add final concluding sentences after the empirical section is written.]
 
