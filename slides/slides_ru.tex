@@ -135,7 +135,7 @@
         Существует набор матриц адаптеров $\{\Delta W\}\subset \mathcal{M}_{R,S}^{D,D}$ с SR $\leqslant S$ такой, что
         \vspace{-0.2cm}
         $$\mathbb{E}\|f(x) - \overline{f}(x)\|_F \leqslant \beta\sum_{l=1}^{L}\Big(\prod_{k=l+1}^L \gamma_k\Big)\mathcal{D}_l$$
-        $\bullet$ $\gamma_k$: константа Липшица целевого блока $k$ по входу (через FFN + MHA)\\
+        $\bullet$ $\gamma_k$: константа Липшица блока $k$ по входу (через FFN + MHA)\\
         $\bullet$ $\mathcal{D}_l = \mathcal{T}_{2,l} + \|\overline{W_{2,l}}\|\mathcal{T}_{1,l} + \|\overline{W_{2,l}}\|\|\overline{W_{1,l}}\|\sum_h \mathcal{D}_{att,l}^h$ (ошибки FFN + attention)\\
         $\bullet$ $\mathcal{D}_{att,l}^h$: ошибка головы $\propto \mathcal{T}_{O},\mathcal{T}_{V},\mathcal{T}_{Q},\mathcal{T}_{K}$
     \end{block}
@@ -216,7 +216,6 @@
         \item Доказана лемма для оптимальной аппроксимации матрицы матрицей c рангом $\leqslant R$ и stable rank $\leqslant S$
         \item Уточнены границы выразительности LoRA для FNN и Transformer с учётом stable rank
         \item Усилена верхняя оценка на generalisation gap для LoRA с $\mathcal{O}(\sqrt{R/N})$ до $\mathcal{O}(\sqrt{S/N})$
-        \item Экспериментально показано, что $\propto \sqrt{S}$ лучше чем $\propto \sqrt{R}$ приближает динамику generalisation gap при изменении гиперпараметров
         \item Экспериментально показано, что stable rank является лучшим чем алгебраический ранг индикатором для масштабирования обобщающей способности и выразительности
     \end{enumerate}
 \end{frame}
