@@ -12,3 +12,4 @@
 papers/*
 *.bbl
 code\analysis.ipynb
+docs/*
