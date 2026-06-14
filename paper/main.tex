@@ -1,12 +1,12 @@
-\documentclass{article}
-\usepackage{arxiv}
+% \documentclass{article}
+% \usepackage{arxiv}
 
-% \documentclass[a4paper,14pt]{extarticle}
-% \usepackage[a4paper,top=2.0cm, bottom=1.5cm, left=3.0cm, right=1.5cm]{geometry}
+\documentclass[a4paper,14pt]{extarticle}
+\usepackage[a4paper,top=2.0cm, bottom=1.5cm, left=3.0cm, right=1.5cm]{geometry}
 
-\usepackage[utf8x]{inputenc}
-\usepackage[english, russian]{babel}
-% \usepackage[T2A, T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
 \usepackage{url}
 \usepackage{booktabs}
 \usepackage{amsfonts}
@@ -450,9 +450,9 @@ pdfauthor={Nikita Okhotnikov},
     $$TN_{L,D}(\cdot;((W_{Ql}^h, W_{Kl}^h, W_{Vl}^h, W_{Ol}^h)_{h=1}^H, (W_{1l}, W_{2l}, b_{1l}, b_{2l}))_{l=1}^L, W_o)$$
     be a transformer network with $L$ transformer blocks and an output linear layer parameterized by $W_o$. For theoretical feasibility we assume no dropout or normalisation operations. Each block is a composition of an $H$-head self-attention mechanism \cite{vaswani2023attentionneed} with weights $(W_{Ql}^h, W_{Kl}^h, W_{Vl}^h, W_{Ol}^h)_{h=1}^H$ and a 2-layer FFN with weights $(W_{1l}, W_{2l})$ and biases $(b_{1l}, b_{2l})$. Additionally, we assume all $W\in\mathbb{R}^{D\times D}, ~b\in \mathbb{R}^D$.
     We use the same prefix notation as before:
-    $$\text{target TN  }~~ \overline{f} := TN_{L,D}(\cdot;((\overline{W_{Ql}^h}, \overline{W_{Kl}^h}, \overline{W_{Vl}^h},\overline{W_{Ol}^h})_{h=1}^H,(\overline{W_{1l}}, \overline{W_{2l}}, \overline{b_{1l}}, \overline{b_{2l}}))_{l=1}^L,\overline{W_o}), $$ 
-    $$\text{frozen TN }~~ f_0 := TN_{L,D}(\cdot;((W_{Ql}^h, W_{Kl}^h, W_{Vl}^h, W_{Ol}^h)_{h=1}^H, (W_{1l}, W_{2l}, b_{1l}, b_{2l}))_{l=1}^L, W_o),$$
-    $$\text{adapted TN }~~ f := TN_{L,D}(\cdot;((W_{Ql}^h + \Delta W_{Ql}^h, W_{Kl}^h + \Delta W_{Kl}^h, W_{Vl}^h + \Delta W_{Vl}^h, W_{Ol}^h + \Delta W_{Ol}^h)_{h=1}^H, $$ 
+    $$\text{target TN  } \overline{f} \!:= TN_{L,D}(\cdot;((\overline{W_{Ql}^h}, \overline{W_{Kl}^h}, \overline{W_{Vl}^h},\overline{W_{Ol}^h})_{h=1}^H,(\overline{W_{1l}}, \overline{W_{2l}}, \overline{b_{1l}}, \overline{b_{2l}}))_{l=1}^L,\overline{W_o}), $$ 
+    $$\text{frozen TN } f_0 \!:= TN_{L,D}(\cdot;((W_{Ql}^h, W_{Kl}^h, W_{Vl}^h, W_{Ol}^h)_{h=1}^H, (W_{1l}, W_{2l}, b_{1l}, b_{2l}))_{l=1}^L, W_o),$$
+    $$\text{adapted TN } f \!:= TN_{L,D}(\cdot;((W_{Ql}^h + \Delta W_{Ql}^h, W_{Kl}^h + \Delta W_{Kl}^h, W_{Vl}^h + \Delta W_{Vl}^h, W_{Ol}^h + \Delta W_{Ol}^h)_{h=1}^H, $$ 
     $$(W_{1l} + \Delta W_{1l}, W_{2l} + \Delta W_{2l}, \widehat{b_{1l}}, \widehat{b_{2l}}))_{l=1}^L, W_o + \Delta W_o)$$
     
     For a matrix $G\in \mathbb{R}^{D\times D}$, let its optimal rank-$R$ approximation be $G_R$ with singular values $\sigma_1(G) \geqslant \dots \geqslant \sigma_R(G)$. Let $\mathcal{T}(G)$ be the localized SR error from \textbf{Lemma 2}:
@@ -471,7 +471,7 @@ pdfauthor={Nikita Okhotnikov},
     
         Let $x\in \mathbb{R}^{D\times N}$ be the random input sequence. Assume $\overline{b_{\cdot\cdot}} = \widehat{b_{\cdot\cdot}}$. Let $z_l\in \mathbb{R}^{D\times N}$ be the output of $l$ block in the adapted model and $\overline{z_l}$ be the output of the same block in the target model. Consider $z_0 = \overline{z_0} = x$. \\
         Let us define per matrix discrepancies as follows:
-        $$\forall l\in\overline{1,L},~h\in\overline{1,H},~ \forall ~ role\in \{Q, K, V, O\}: ~~\mathcal{T}_{role, l}^h =\mathcal{T}(W_{role, l}^h) = \|W_{role, l}^h - \overline{W_{role, l}^h}\|_F$$
+        $$\forall l\in\overline{1,L},~h\in\overline{1,H},~ \forall ~ role\in \{Q, K, V, O\}: ~\mathcal{T}_{role, l}^h =\mathcal{T}(W_{role, l}^h) = \|W_{role, l}^h - \overline{W_{role, l}^h}\|_F$$
         $$\forall l\in\overline{1,L},~ \forall ~ role \in \{1, 2\}: ~~\mathcal{T}_{role, l} =\mathcal{T}(W_{role, l}) = \|W_{role, l}^h - \overline{W_{role, l}}\|_F$$
         $$\mathcal{T}_o =\mathcal{T}(W_o) = \|W_o - \overline{W_o}\|_F$$
         Additionally we define the following bound constants:
@@ -488,7 +488,7 @@ pdfauthor={Nikita Okhotnikov},
         \begin{enumerate}
             \item $\gamma_k$ is the Lipschitz constant of target layer k with respect to the input:
                 $$\gamma_k = \|\overline{W_{2,k}^h}\|\|\overline{W_{1,k}^h}\|\left(1 + \sum\limits_{h=1}^H\Psi_k^h\right)$$
-                $$ \Psi_k^h = \left\|\overline{W_{O,k}^h}\right\|_2 \left( \left\|\overline{W_{V,k}^h}\right\|_2 + \frac{\lambda_{sm} \beta^2}{\sqrt{D}} \left\|\overline{W_{V,k}^h}\right\|_2 \left(\mu_{Q,k}^h \left\|\overline{W_{K,k}^h}\right\|_2 + \left\|\overline{W_{K,k}^h}\right\|_2 \left\|\overline{W_{Q,k}^h}\right\|_2\right) \right) $$
+                $$ \Psi_k^h = \left\|\overline{W_{O,k}^h}\right\|_2 \!\left( \left\|\overline{W_{V,k}^h}\right\|_2 \!+\! \frac{\lambda_{sm} \beta^2}{\sqrt{D}} \left\|\overline{W_{V,k}^h}\right\|_2\!\left(\mu_{Q,k}^h \left\|\overline{W_{K,k}^h}\right\|_2 + \left\|\overline{W_{K,k}^h}\right\|_2 \left\|\overline{W_{Q,k}^h}\right\|_2\right)\!\!\right) $$
 
             \item $\mathcal{D}_l$ is the Local Distortion at layer $l$, defined as:
                     $$ \mathcal{D}_l = \mathcal{T}_{2,l} + \|\overline{W_{2,l}}\|_2 \mathcal{T}_{1,l} + \|\overline{W_{2,l}}\|_2 \|\overline{W_{1,l}}\|_2 \sum_{h=1}^H \mathcal{D}_{att, l}^h $$
@@ -509,8 +509,9 @@ pdfauthor={Nikita Okhotnikov},
         $$ \|E_l\|_F \le \underbrace{\left\| \text{FFN}_l(Y_l) - \overline{\text{FFN}_l}(Y_l) \right\|_F}_{\textbf{FFN Parameter Error}} + \underbrace{\left\| \overline{\text{FFN}_l}(Y_l) - \overline{\text{FFN}_l}(\overline{Y_l}) \right\|_F}_{\textbf{FFN Input Error}} $$
 
         The FFN part of TN layer $l$ is $W_{2,l} \text{ReLU}(W_{1,l} x)$. Then the \textbf{FFN parameter error}:
-        $$\left\|W_{2,l} \text{ReLU}(W_{1,l} Y_l) - \overline{W_{2,l}} \text{ReLU}(\overline{W_{1,l}} Y_l)\right\|_F \leqslant \left\|(W_{2,l} - \overline{W_{2,l}})\text{ReLU}(W_{1,l} Y_l)\right\|_F + \left\|\overline{W_{2,l}}\right\|_2 \left\|\text{ReLU}(W_{1,l} Y_l) - \text{ReLU}(\overline{W_{1,l}} Y_l)\right\|_F \leqslant $$
-        $$ \leqslant \mathcal{T}_{2,l} \|Y_l\|_F + \left\|\overline{W_{2,l}}\right\|_2 \cdot \left\|(W_{1,l} - \overline{W_{1,l}}) Y_l\right\|_F \leqslant \beta \mathcal{T}_{2,l} + \left\|\overline{W_{2,l}}\right\|_2 \beta \mathcal{T}_{1,l} $$
+        $$\left\|W_{2,l} \text{ReLU}(W_{1,l} Y_l) - \overline{W_{2,l}} \text{ReLU}(\overline{W_{1,l}} Y_l)\right\|_F \leqslant \left\|(W_{2,l} - \overline{W_{2,l}})\text{ReLU}(W_{1,l} Y_l)\right\|_F + $$
+        $$+ \left\|\overline{W_{2,l}}\right\|_2 \left\|\text{ReLU}(W_{1,l} Y_l) - \text{ReLU}(\overline{W_{1,l}} Y_l)\right\|_F \leqslant \mathcal{T}_{2,l} \|Y_l\|_F +$$
+        $$ + \left\|\overline{W_{2,l}}\right\|_2 \cdot \left\|(W_{1,l} - \overline{W_{1,l}}) Y_l\right\|_F \leqslant \beta \mathcal{T}_{2,l} + \left\|\overline{W_{2,l}}\right\|_2 \beta \mathcal{T}_{1,l} $$
 
         The \textbf{FFN Input Error} is bounded by the following
         $$\left\|\overline{W_{2,l}}(\text{ReLU}(\overline{W_{1,l}} Y_l) - \text{ReLU}(\overline{W_{1,l}} \overline{Y_l}))\right\|_F \leqslant \left\|\overline{W_{2,l}}\right\|_2 \cdot \left\|\overline{W_{1,l}}\right\|_2 \cdot \left\|Y_l - \overline{Y_l}\right\|_F $$
@@ -524,23 +525,27 @@ pdfauthor={Nikita Okhotnikov},
         A single head output: 
         $$\text{Head}_h^l(z_{l-1}) = W_{O,l}^h V_l^h (A_l^h)^T$$ 
         where 
-        $$V_l^h = W_{V, l}^h z_{l-1}, ~~ A_l^h = \text{Softmax}(S_l^h), ~~S_l^h = \frac{1}{\sqrt{D}} (K_l^h)^T Q_l^h, ~~K_l^h=W_{K,l}^h z_{l-1},~~ Q_l^h=W_{Q,l}^h z_{l-1}$$
+        $$V_l^h = W_{V, l}^h z_{l-1}, ~~ A_l^h = \text{Softmax}(S_l^h), ~~S_l^h = \frac{1}{\sqrt{D}} (K_l^h)^T Q_l^h, ~~K_l^h=W_{K,l}^h z_{l-1},~~ $$
+        $$Q_l^h=W_{Q,l}^h z_{l-1}$$
 
         As with the FFN part, we decompose the error $\|\text{Head} - \overline{\text{Head}}\|_F$ into \textbf{Head parameter Error} (functions of $\mathcal{T}$) and \textbf{Head Input Error} (functions of $E_{l-1}$).
 
         Output projection $W_{O,l}^h$:
-        $$ W_{O,l}^h V_l^h (A_l^h)^T - \overline{W_{O,l}^h} \overline{V_l^h} (\overline{A_l^h})^T = \left(W_{O,l}^h - \overline{W_{O,l}^h}\right) V_l^h (A_l^h)^T + \overline{W_{O,l}^h} \left(V_l^h (A_l^h)^T - \overline{V_l^h} (\overline{A_l^h}^T)\right) $$
+        $$ W_{O,l}^h V_l^h (A_l^h)^T - \overline{W_{O,l}^h} \overline{V_l^h} (\overline{A_l^h})^T = \left(W_{O,l}^h - \overline{W_{O,l}^h}\right) V_l^h (A_l^h)^T + $$
+        $$+ \overline{W_{O,l}^h} \left(V_l^h (A_l^h)^T - \overline{V_l^h} (\overline{A_l^h}^T)\right) $$
 
         For the first term the following holds:
-        $$\left\|\left(W_{O,l}^h - \overline{W_{O,l}^h}\right) V_l^h (A_l^h)^T \right\|_F \leqslant \left\|W_{O,l}^h - \overline{W_{O,l}^h}\right\|_F\cdot \left\|V_l^h (A_l^h)^T\right\|_2 \leqslant \left\|W_{O,l}^h - \overline{W_{O,l}^h}\right\|_F\cdot \left\|V_l^h (A_l^h)^T\right\|_F \leqslant $$
-        $$\leqslant \mathcal{T}_{O,l}^h \cdot \left\|V_l^h\right\|_F \cdot \left\|(A_l^h)^T\right\|_2\leqslant \mathcal{T}_{O,l}^h \cdot \left\|W_{V,l}^h z_{l-1}\right\|_F \cdot 1 \leqslant \mathcal{T}_{O,l}^h \cdot \left\|W_{V,l}^h\right\|_2\cdot \|z_{l-1}\|_F \leqslant \mathcal{T}_{O,l}^h \cdot \mu_{V,l}^h\cdot \beta$$
+        $$\left\|\left(W_{O,l}^h - \overline{W_{O,l}^h}\right) V_l^h (A_l^h)^T \right\|_F \leqslant \left\|W_{O,l}^h - \overline{W_{O,l}^h}\right\|_F\cdot \left\|V_l^h (A_l^h)^T\right\|_2 \leqslant $$
+        $$\leqslant \left\|W_{O,l}^h - \overline{W_{O,l}^h}\right\|_F\cdot \left\|V_l^h (A_l^h)^T\right\|_F \leqslant \mathcal{T}_{O,l}^h \cdot \left\|V_l^h\right\|_F \cdot \left\|(A_l^h)^T\right\|_2\leqslant \mathcal{T}_{O,l}^h \cdot \left\|W_{V,l}^h z_{l-1}\right\|_F \cdot 1 \leqslant $$
+        $$\leqslant \mathcal{T}_{O,l}^h \cdot \left\|W_{V,l}^h\right\|_2\cdot \|z_{l-1}\|_F \leqslant \mathcal{T}_{O,l}^h \cdot \mu_{V,l}^h\cdot \beta$$
         
         For the second term:
         $$\left\|\overline{W_{O,l}^h} \left(V_l^h (A_l^h)^T - \overline{V_l^h} (\overline{A_l^h})^T\right)\right\| \leqslant \left\|\overline{W_{O,l}^h}\right\|_2 \left\|V_l^h (A_l^h)^T - \overline{V_l^h} (\overline{A_l^h})^T\right\|_F$$
         $$ V_l^h (A_l^h)^T - \overline{V_l^h} (\overline{A_l^h})^T = (V_l^h - \overline{V_l^h}) (A_l^h)^T + \overline{V_l^h} (A_l^h - (\overline{A_l^h})^T) $$
         $V$ matrices difference:
         $$V_l^h - \overline{V_l^h} = (W_{V,l}^h - \overline{W_{V,l}^h})z_{l-1} + \overline{W_{V,l}^h}(z_{l-1} - \overline{z_{l-1}})$$
-        $$\left\|V_l^h - \overline{V_l^h}\right\|_F\leqslant \left\|(W_{V,l}^h - \overline{W_{V,l}^h})z_{l-1}\right\|_F + \left\|\overline{W_{V,l}^h}(z_{l-1} - \overline{z_{l-1}})\right\|_F\leqslant \mathcal{T}_{V,l}^h \beta + \left\|\overline{W_{V,l}^h}\right\|_2\cdot\|E_{l-1}\|_F$$
+        $$\left\|V_l^h - \overline{V_l^h}\right\|_F\leqslant \left\|(W_{V,l}^h - \overline{W_{V,l}^h})z_{l-1}\right\|_F + \left\|\overline{W_{V,l}^h}(z_{l-1} - \overline{z_{l-1}})\right\|_F\leqslant $$
+        $$\leqslant\mathcal{T}_{V,l}^h \beta + \left\|\overline{W_{V,l}^h}\right\|_2\cdot\|E_{l-1}\|_F$$
         $A$ matrices difference:
 
         $$\left\|A_l^h - \overline{A_l^h}\right\|_F \leqslant \lambda_{sm} \left\|S_l^h - \overline{S_l^h}\right\|_F $$
@@ -564,9 +569,11 @@ pdfauthor={Nikita Okhotnikov},
         $$\left\|S_l^h - \overline{S_l^h}\right\|_F \leqslant \frac{1}{\sqrt{D}}\left(\left\|(K_l^h - \overline{K_l^h})^T Q_l^h\right\|_F + \left\|(\overline{K_l^h})^T(Q_l^h - \overline{Q_l^h})\right\|_F\right) \leqslant$$
         $$\leqslant \frac{1}{\sqrt{D}}\left(\left\|K_l^h - \overline{K_l^h}\right\|_F \left\|W_{Q,l}^h\right\|_2 \left\|z_{l-1}\right\|_F +  \left\|\overline{W_{K,l}^h}\right\|_2 \left\|\overline{z_{l-1}}\right\|_F \left\|Q_l^h - \overline{Q_l^h}\right\|_F\right) \leqslant $$
         $$\leqslant \frac{\beta}{\sqrt{D}}\left(\left\|K_l^h - \overline{K_l^h}\right\|_F \mu_{Q,l}^h +  \left\|\overline{W_{K,l}^h}\right\|_2  \left\|Q_l^h - \overline{Q_l^h}\right\|_F\right) \leqslant$$
-        $$ \leqslant \frac{\beta}{\sqrt{D}}\left(\mu_{Q,l}^h \mathcal{T}_{K,l}^h \beta + \left\|\overline{W_{K,l}^h}\right\|_2 \mathcal{T}_{Q,l}^h \beta \right) + \frac{\beta}{\sqrt{D}}\left(\mu_{Q,l}^h \left\|\overline{W_{K,l}^h}\right\|_2 + \left\|\overline{W_{K,l}^h}\right\|_2 \left\|\overline{W_{Q,l}^h}\right\|_2\right) \left\|E_{l-1}\right\|_F$$
-        $$\left\|\overline{V_l^h} (A_l^h - (\overline{A_l^h})^T)\right\|_F \leqslant $$
-        $$\leqslant \lambda_{sm} \beta \left\|\overline{W_{V,l}^h}\right\|_2 \left[ \frac{\beta}{\sqrt{D}}\left(\mu_{Q,l}^h \mathcal{T}_{K,l}^h \beta + \left\|\overline{W_{K,l}^h}\right\|_2 \mathcal{T}_{Q,l}^h \beta \right) + \frac{\beta}{\sqrt{D}}\left(\mu_{Q,l}^h \left\|\overline{W_{K,l}^h}\right\|_2 + \left\|\overline{W_{K,l}^h}\right\|_2 \left\|\overline{W_{Q,l}^h}\right\|_2\right) \left\|E_{l-1}\right\|_F \right]$$
+        $$ \leqslant \frac{\beta}{\sqrt{D}}\left(\mu_{Q,l}^h \mathcal{T}_{K,l}^h \beta + \left\|\overline{W_{K,l}^h}\right\|_2 \mathcal{T}_{Q,l}^h \beta \right) + \frac{\beta}{\sqrt{D}}\biggr{(}\mu_{Q,l}^h \left\|\overline{W_{K,l}^h}\right\|_2 + $$
+        $$+ \left\|\overline{W_{K,l}^h}\right\|_2 \left\|\overline{W_{Q,l}^h}\right\|_2\biggr{)} \left\|E_{l-1}\right\|_F$$
+        $$\left\|\overline{V_l^h} (A_l^h - (\overline{A_l^h})^T)\right\|_F \leqslant \lambda_{sm} \beta \left\|\overline{W_{V,l}^h}\right\|_2 \biggr[ \frac{\beta}{\sqrt{D}}\left(\mu_{Q,l}^h \mathcal{T}_{K,l}^h \beta + \left\|\overline{W_{K,l}^h}\right\|_2 \mathcal{T}_{Q,l}^h \beta \right) + $$
+        $$\frac{\beta}{\sqrt{D}}\left(\mu_{Q,l}^h \left\|\overline{W_{K,l}^h}\right\|_2 + \left\|\overline{W_{K,l}^h}\right\|_2 \left\|\overline{W_{Q,l}^h}\right\|_2\right) \left\|E_{l-1}\right\|_F \biggr]$$
+
         $$\left\|V_l^h (A_l^h)^T - \overline{V_l^h} (\overline{A_l^h})^T\right\|_F \leqslant \left\|V_l^h - \overline{V_l^h}\right\|_F \left\|(A_l^h)^T\right\|_2 + \left\|\overline{V_l^h} (A_l^h - (\overline{A_l^h})^T)\right\|_F\leqslant $$
         $$\leqslant  \mathcal{T}_{V,l}^h \beta + \left\|\overline{W_{V,l}^h}\right\|_2 \left\|E_{l-1}\right\|_F + \frac{\lambda_{sm} \beta^2}{\sqrt{D}} \left\|\overline{W_{V,l}^h}\right\|_2 \left(\mu_{Q,l}^h \mathcal{T}_{K,l}^h \beta + \left\|\overline{W_{K,l}^h}\right\|_2 \mathcal{T}_{Q,l}^h \beta \right) + $$
         $$ + \frac{\lambda_{sm} \beta^2}{\sqrt{D}} \left\|\overline{W_{V,l}^h}\right\|_2 \left(\mu_{Q,l}^h \left\|\overline{W_{K,l}^h}\right\|_2 + \left\|\overline{W_{K,l}^h}\right\|_2 \left\|\overline{W_{Q,l}^h}\right\|_2\right) \left\|E_{l-1}\right\|_F$$
@@ -595,10 +602,12 @@ pdfauthor={Nikita Okhotnikov},
         $$ \|E_l\|_F \leqslant \beta (\mathcal{T}_{2,l} + \left\|\overline{W_{2,l}}\right\|_2 \mathcal{T}_{1,l}) + \left\|\overline{W_{2,l}}\right\|_2 \cdot \left\|\overline{W_{1,l}}\right\|_2 \cdot \left\|Y_l - \overline{Y_l}\right\|_F $$
 
         Substitute the bound for $\|Y_l - \overline{Y_l}\|_F$ into the equation:
-        $$\|E_l\|_F \leqslant \beta \mathcal{T}_{2,l} + \beta \left\|\overline{W_{2,l}}\right\|_2 \mathcal{T}_{1,l} + \left\|\overline{W_{2,l}}\right\|_2 \left\|\overline{W_{1,l}}\right\|_2 \left[ \beta \sum_{h=1}^H \mathcal{D}_{att, l}^h + \left( 1 + \sum_{h=1}^H \Psi_l^h \right) \|E_{l-1}\|_F \right]$$
+        $$\|E_l\|_F \leqslant \beta \mathcal{T}_{2,l} + \beta \left\|\overline{W_{2,l}}\right\|_2 \mathcal{T}_{1,l} + $$
+        $$+ \left\|\overline{W_{2,l}}\right\|_2 \left\|\overline{W_{1,l}}\right\|_2 \left[ \beta \sum_{h=1}^H \mathcal{D}_{att, l}^h + \left( 1 + \sum_{h=1}^H \Psi_l^h \right) \|E_{l-1}\|_F \right]$$
         
         Group the terms into the local layer distortion $\mathcal{D}_l$ and the layer Lipschitz amplification $\Lambda_l$:
-        $$\|E_l\|_F \leqslant \beta \underbrace{\left[ \mathcal{T}_{2,l} + \left\|\overline{W_{2,l}}\right\|_2 \mathcal{T}_{1,l} + \left\|\overline{W_{2,l}}\right\|_2 \left\|\overline{W_{1,l}}\right\|_2 \sum_{h=1}^H \mathcal{D}_{att, l}^h \right]}_{\mathcal{D}_l} + \underbrace{\left[ \left\|\overline{W_{2,l}}\right\|_2 \left\|\overline{W_{1,l}}\right\|_2 \left( 1 + \sum_{h=1}^H \Psi_l^h \right) \right]}_{\Lambda_l} \|E_{l-1}\|_F$$
+        $$\|E_l\|_F \leqslant \beta \underbrace{\left[ \mathcal{T}_{2,l} + \left\|\overline{W_{2,l}}\right\|_2 \mathcal{T}_{1,l} + \left\|\overline{W_{2,l}}\right\|_2 \left\|\overline{W_{1,l}}\right\|_2 \sum_{h=1}^H \mathcal{D}_{att, l}^h \right]}_{\mathcal{D}_l} + $$
+        $$+ \underbrace{\left[ \left\|\overline{W_{2,l}}\right\|_2 \left\|\overline{W_{1,l}}\right\|_2 \left( 1 + \sum_{h=1}^H \Psi_l^h \right) \right]}_{\Lambda_l} \|E_{l-1}\|_F$$
         $$\|E_l\|_F \leqslant \beta \mathcal{D}_l + \Lambda_l \|E_{l-1}\|_F$$
         By unrolling the recurrence, considering $\|E_0\|_F = 0$:
 
@@ -702,7 +711,8 @@ pdfauthor={Nikita Okhotnikov},
         $$\mathbb{E}_U[\widehat{L}_{\gamma / 2}(W + U)] \leqslant \widehat{L}_\gamma(W) + \mathbb{P}_U[\Delta f(U) > \gamma / 4]$$
 
         Here we substitute these inequalities into the fundamental theorem:
-        $$L_0(W)\leqslant \mathbb{E}_U[L_{\gamma / 2}(W + U)] + \mathbb{P}_U[\Delta f(U) > \gamma / 4]\leqslant \mathbb{E}_U[\widehat{L}_{\gamma / 2}(W + U)] + \mathbb{P}_U[\Delta f(U) > \gamma / 4] + \sqrt{\frac{KL(\mathcal{Q} || \mathcal{P}) + \log\left(\frac{2N}{\delta}\right)}{2N}}  $$
+        $$L_0(W)\leqslant \mathbb{E}_U[L_{\gamma / 2}(W + U)] + \mathbb{P}_U[\Delta f(U) > \gamma / 4]\leqslant $$
+        $$\leqslant\mathbb{E}_U[\widehat{L}_{\gamma / 2}(W + U)] + \mathbb{P}_U[\Delta f(U) > \gamma / 4] + \sqrt{\frac{KL(\mathcal{Q} || \mathcal{P}) + \log\left(\frac{2N}{\delta}\right)}{2N}}  $$
         $$L_0(W)\leqslant \widehat{L}_\gamma(W) + 2\mathbb{P}_U[\Delta f(U) > \gamma / 4] + \sqrt{\frac{KL(\mathcal{Q} || \mathcal{P}) + \log\left(\frac{2N}{\delta}\right)}{2N}}$$
 
 
@@ -733,7 +743,8 @@ pdfauthor={Nikita Okhotnikov},
         $$ \|\tilde{h}_{t-1}\|_2 \leqslant B_x \left(1 + \frac{1}{T}\right)^{t-1} \prod_{i=1}^{t-1} \bar{\beta}_i \leqslant e B_x \prod_{i=1}^{t-1} \bar{\beta}_i $$
 
         Substituting this back into the unrolled recursion, we get:
-        $$ \|f_{W+U}(x) - f_W(x)\|_2 \leqslant \sum_{t=1}^T \left( \prod_{i=t+1}^T \bar{\beta}_i \right) \|U_t\|_{op} \left( e B_x \prod_{i=1}^{t-1} \bar{\beta}_i \right) = e B_x \left( \prod_{i=1}^T \bar{\beta}_i \right) \sum_{t=1}^T \frac{\|U_t\|_{op}}{\bar{\beta}_t} $$
+        $$ \|f_{W+U}(x) - f_W(x)\|_2 \leqslant \sum_{t=1}^T \left( \prod_{i=t+1}^T \bar{\beta}_i \right) \|U_t\|_{op} \left( e B_x \prod_{i=1}^{t-1} \bar{\beta}_i \right) = $$
+        $$= e B_x \left( \prod_{i=1}^T \bar{\beta}_i \right) \sum_{t=1}^T \frac{\|U_t\|_{op}}{\bar{\beta}_t} $$
 
         Since we bounded $\|x\|_2$ with $B_x$ we have already taken the maximum over $x \in S$, so the final perturbation bound $\Delta f(U)$:
         $$ \Delta f(U) \leqslant e B_x \left( \prod_{i=1}^T \bar{\beta}_i \right) \sum_{t=1}^T \frac{\|U_t\|_{op}}{\bar{\beta}_t} $$
@@ -942,9 +953,9 @@ pdfauthor={Nikita Okhotnikov},
 
     Across both regression and classification, the generalization gap is consistently better predicted by $\sqrt{\overline{\sr}}$. The optimizer's implicit bias toward low-SR solutions is robust to both task type and target complexity: even when the data is generated with high-SR shifts and expected to require higher SR solution, LoRA tends to converge to low-SR ones, even though full fine-tuning consistently produces higher SR updates. Thus, rank thus systematically overestimates LoRA's effective capacity.
 
-    As a future research direction, we would add that beyond post-hoc diagnostics, the SR saturation curve can guide rank selection upfront: by measuring where SR plateaus for a given architecture, practitioners can identify the minimal effective rank without sweeping validation performance across ranks. Additionally, SR provides a unified metric for comparing LoRA variants or optimization techniques -- a higher SR at the same nominal rank apparently indicates better utilization of the allocated parameter budget.
+    As a future research direction, we would add that beyond post-hoc diagnostics, the SR saturation curve can guide rank selection upfront: by measuring where SR plateaus for a given architecture, it might be possible to identify the minimal effective rank without sweeping validation performance across ranks. Additionally, SR provides a unified metric for comparing LoRA variants or optimization techniques -- a higher SR at the same nominal rank apparently indicates better utilization of the allocated parameter budget.
 
-    Extending these measurements to LLM-scale LoRA fine-tuning on NLP benchmarks would test whether the SR--generalization relationship holds at scale. Investigating optimizer-specific effects on the SR distribution could reveal whether the low-SR bias is optimizer-dependent or a deeper property of factored gradient descent.
+    Extending our measurements to LLM-scale LoRA fine-tuning on NLP benchmarks would test whether the SR -- generalization relationship holds at scale. Investigating optimizer-specific effects on the SR distribution could reveal whether the low-SR bias is optimizer-dependent or a deeper property of factored gradient descent.
 
 
 
@@ -957,7 +968,6 @@ pdfauthor={Nikita Okhotnikov},
     % Extendability: How does this apply to other PEFT methods...? Since they alter initialization but retain low-rank gradients, the SR framework should directly apply. 
     % Bla-bla other extensions/applications... 
     
-    
 
     In this thesis, we established stable rank as the mathematically appropriate theoretical measure for analyzing LoRA's properties, correcting the persistent reliance on algebraic rank in existing literature. Our key contributions are:
     
@@ -965,10 +975,11 @@ pdfauthor={Nikita Okhotnikov},
 
     Expressivity Bounds (Theorems 1-2): using derived optimal solution for single-matrix approximation, we extend rank-based expressivity bounds \cite{zeng2024expressivepowerlowrankadaptation} for FNNs and transformers to stable rank-constrained scenario, that is widely common in practice. We claim that our bounds better represent the actual expressivity capacity scaling, even though the exact expression is still way too far from practical application.
     
-
-    Generalization Bounds (Theorem 3): We leveraged a PAC-Bayesian framework to rigorously prove a tighter generalization gap that scales with $\mathcal{O}(\sqrt{\sum_t \Lambda_t^2 S_t / \bar{\beta}_t^2})$. Because optimization implicitly biases LoRA such that $S_t \ll r_t$, our theorem mathematically validates why massively overparameterized LoRA adapters generalize remarkably well in practice.
+    Generalization Bounds (Theorem 3): We leveraged a PAC-Bayesian framework to rigorously prove a tighter generalization gap that scales with $\mathcal{O}(\sqrt{\sr(\Delta W) / N})$ rather than previously know best $\mathcal{O}(\sqrt{\rank(\Delta W) / N})$. Because optimization procedure often implicitly biases LoRA such that $sr \ll rank$, our theorem suggest a mathematical reason why even massively overparameterized LoRA adapters might still generalize well in practice.
     
-    % [TODO: Add final concluding sentences after the empirical section is written.]
+    Our controlled synthetic experiments on both regression and classification tasks confirm that the generalization gap scales with $\sqrt{\sr(\Delta W)}$ rather than with the nominal adapter rank, directly validating the PAC-Bayesian bound of Theorem~3.
+    These experiments also reveal that LoRA optimization consistently converges to adapters with stable rank far below their algebraic rank, while full fine-tuning of the same model consistently produces updates with higher SR.
+    Extending this stable-rank-centric analysis to large-scale language model benchmarks and exploring whether the low-SR implicit bias is optimizer-dependent or a fundamental property of factored gradient descent remain promising avenues for future investigation.
 
 
     \bibliographystyle{plain}
